@@ -1,6 +1,6 @@
---------------------------------------------------------------------
-
---------------------------------------------------------------------
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- |
 -- Module    : Network.Curl.Opts
@@ -15,330 +15,330 @@
 -- when we use @perform@ on a @Curl@ handle.
 module Network.Curl.Opts where
 
-import Data.Bits
-import Data.List
-import Foreign.C.Types
-import Foreign.Ptr
-import Network.Curl.Post
-import Network.Curl.Types
+import Data.Bits (Bits (complement, (.|.)))
+import Data.List (intercalate)
+import Data.Word (Word32, Word64)
+import Foreign.C.Types (CChar, CInt)
+import Foreign.Ptr (Ptr, castPtr)
+import GHC.Generics (Generic)
+import Network.Curl.Post (HttpPost)
+import Network.Curl.Types (Curl, CurlH, Port, UrlString)
 
 data CurlOption
   = -- | external pointer to pass to as 'WriteFunction's last argument.
-    CurlFileObj (Ptr ())
+    FileObj (Ptr ())
   | -- | the URL to use for next request; can be the full URL or just the authority\/hostname.
-    CurlURL URLString
+    Url UrlString
   | -- | what port to use.
-    CurlPort Long
+    Port Word32
   | -- | name of proxy
-    CurlProxy String
+    Proxy String
   | -- | the "user:pass" string to use
-    CurlUserPwd String
+    UserPwd String
   | -- | same thing, but for the proxy.
-    CurlProxyUserPwd String
+    ProxyUserPwd String
   | -- | byte range to fetch
-    CurlRange String
+    Range String
   | -- | external pointer to pass to as 'WriteFunction's last argument.
-    CurlInFile FilePath
+    InFile FilePath
   | -- | buffer for curl to deposit error messages (must at least CURL_ERROR_SIZE bytes long). Uses standard error if not specified.
-    CurlErrorBuffer (Ptr CChar)
+    ErrorBuffer (Ptr CChar)
   | -- | callback to handle incoming data.
-    CurlWriteFunction WriteFunction
+    WriteFunc WriteFunction
   | -- | callback for supplying outgoing\/uploaded data.
-    CurlReadFunction ReadFunction
+    ReadFunc ReadFunction
   | -- | number of seconds before timing out curl operation\/request.
-    CurlTimeout Long
+    Timeout Word32
   | -- | expected size of uploaded data.
-    CurlInFileSize Long
+    InFileSize Word32
   | -- | (Multipart) POST data.
-    CurlPostFields [String]
+    PostFields [String]
   | -- | Set the Referer: header to the given string.
-    CurlReferer String
+    Referer String
   | -- | The string to feed to the FTP PORT command.
-    CurlFtpPort String
+    FtpPort String
   | -- | Set the User-Agent: header to the given string.
-    CurlUserAgent String
+    UserAgent String
   | -- | If the bytes per sec drops below the given value, the operation is aborted.
-    CurlLowSpeed Long
+    LowSpeed Word32
   | -- | Upper bound for request to complete.
-    CurlLowSpeedTime Long
+    LowSpeedTime Word32
   | -- | Byte offset at which the transfer (HTTP or FTP) should start from.
-    CurlResumeFrom Long
+    ResumeFrom Word32
   | -- | Set the Cookie: header to the given cookie (name=value pairs, semicolon-separated) string.
-    CurlCookie String
+    Cookie String
   | -- | Embellish the outgoing request with the given list of (formatted) header values.
-    CurlHttpHeaders [String]
+    HttpHeaders [String]
   | -- | (Multipart) POST data.
-    CurlHttpPost [HttpPost]
-  | -- | file holding your private SSL certificates (default format is PEM).
-    CurlSSLCert FilePath
+    Multipart [HttpPost]
+  | -- | file holding your private Ssl certificates (default format is PEM).
+    SslCert FilePath
   | -- | password to the above file.
-    CurlSSLPassword String
+    SslPassword String
   | -- | an alias for the previous.
-    CurlSSLKeyPassword String
-  | -- | If true, convert Unix newlines into CRLFs when transferring.
-    CurlCRLF Bool
+    SslKeyPassword String
+  | -- | If true, convert Unix newlines into CrlFs when transferring.
+    Crlf Bool
   | -- | Sequence of FTP commands to execute prior to the main request.
-    CurlQuote [String]
+    Quote [String]
   | -- | State \/ pointer argument to pass to WriteFunction callback.
-    CurlWriteHeader (Ptr ())
+    WriteHeader (Ptr ())
   | -- | Path to file holding initial cookie data; also enables cookie handling.
-    CurlCookieFile FilePath
-  | -- | What protocol to attempt using (0:default;1:TLS;2:SSLv2;3:SSLv3)
-    CurlSSLVersion Long
+    CookieFile FilePath
+  | -- | What protocol to attempt using (0:default;1:TLS;2:Sslv2;3:Sslv3)
+    SslVersion Word32
   | -- | How to interpret a conditional time value.
-    CurlTimeCondition TimeCond
-  | -- | Number of secs since Jan 1, 1970. Interpretation is determined by CurlTimeCondition.
-    CurlTimeValue Long
+    TimeCondition TimeCond
+  | -- | Number of secs since Jan 1, 1970. Interpretation is determined by TimeCondition.
+    TimeValue Word32
   | -- | String holding alternative request command (WebDAV anyone?)
-    CurlCustomRequest String
+    CustomRequest String
   | -- | List of commands to issue to FTP server after the main request.
-    CurlPostQuote [String]
+    PostQuote [String]
   | -- | Not sure what this one does; something about passing it to the output function.
-    CurlWriteInfo String
+    WriteInfo String
   | -- | Control verbosity
-    CurlVerbose Bool
+    Verbose Bool
   | -- | Display outgoing and incoming headers
-    CurlHeader Bool
+    Header Bool
   | -- | Control progress meter
-    CurlNoProgress Bool
+    NoProgress Bool
   | -- | Use HEAD instead of GET
-    CurlNoBody Bool
+    NoBody Bool
   | -- | If status response is >= 300, return an error (and no other output).
-    CurlFailOnError Bool
+    FailOnError Bool
   | -- | Control the main dataflow, i.e., True to perform uploads.
-    CurlUpload Bool
+    Upload Bool
   | -- | Issue a POST request.
-    CurlPost Bool
+    Post Bool
   | -- | Switch NLST for FTP directory listings
-    CurlFtpListOnly Bool
+    FtpListOnly Bool
   | -- | Control if FTP uploads append rather than overwrite files
-    CurlFtpAppend Bool
+    FtpAppend Bool
   | -- | control how or if a user's.netrc will be consulted for user:password
-    CurlUseNetRc NetRcOption
+    UseNetRc NetRcOption
   | -- | Handle auto-redirects by chasing down Location: values in responses.
-    CurlFollowLocation Bool
+    FollowLocation Bool
   | -- | Turn on ASCII transfers for FTP transfers; default is binary (i.e. off).
-    CurlTransferTextASCII Bool
+    TransferTextASCII Bool
   | -- | Use PUT to upload data.
-    CurlPut Bool
+    Put Bool
   | -- | callback for showing progress
-    CurlProgressFunction ProgressFunction
+    ProgressFunc ProgressFunction
   | -- | state argumentto pass to progress callback.
-    CurlProgressData (Ptr ())
+    ProgressData (Ptr ())
   | -- | Control if the Referer: field is set upon following Location: redirects
-    CurlAutoReferer Bool
+    AutoReferer Bool
   | -- | (Numeric) proxy port to use.
-    CurlProxyPort Long
+    ProxyPort Word32
   | -- | Size of the POSTed data.
-    CurlPostFieldSize Long
+    PostFieldSize Word32
   | -- | tunnel all HTTP operations through the proxy.
-    CurlHttpProxyTunnel Bool
+    HttpProxyTunnel Bool
   | -- | Interface name of outgoing network interface ( network interface, IP address, host name.)
-    CurlInterface String
+    Interface String
   | -- | Kerberos security level ("clear", "safe", "confidential", "private" are good values, seemingly.)
-    CurlKrb4Level String
+    Krb4Level String
   | -- | Enable the authentication of peer certificate. Default is True.
-    CurlSSLVerifyPeer Bool
+    SslVerifyPeer Bool
   | -- | If verifying peer's certificate, use certificates in this file to do so.
-    CurlCAInfo FilePath
+    CaInfo FilePath
   | -- | Maximum number of Location: redirects to chase down before giving up.
-    CurlMaxRedirs Long
+    MaxRedirs Word32
   | -- | Try to determine the modification date of remote document; can be queried for.
-    CurlFiletime Bool
+    Filetime Bool
   | -- | List of commands to use for initial telnet negotiations.
-    CurlTelnetOptions [String]
+    TelnetOptions [String]
   | -- | Maximum number of cached active connections.
-    CurlMaxConnects Long
+    MaxConnects Word32
   | -- | No effect (obsolete.)
-    CurlClosePolicy Long
+    ClosePolicy Word32
   | -- | Force the opening up a new connection rather than try to reuse active connections. Default is not to.
-    CurlFreshConnect Bool
+    FreshConnect Bool
   | -- | Do not reuse the connection of next transfer when done.
-    CurlForbidReuse Bool
-  | -- | Path to file used to seed (Open)SSL PRNG.
-    CurlRandomFile FilePath
+    ForbidReuse Bool
+  | -- | Path to file used to seed (Open)Ssl PRNG.
+    RandomFile FilePath
   | -- | Path to domain socket of EG Daemon.
-    CurlEgdSocket FilePath
+    EgdSocket FilePath
   | -- | max number of seconds to wait for the initial connection to happen.
-    CurlConnectTimeout Long
+    ConnectTimeout Word32
   | -- | callback used to handle _incoming_ header data.
-    CurlHeaderFunction WriteFunction
+    HeaderFunction WriteFunction
   | -- | Revert to a GET for the next request.
-    CurlHttpGet Bool
+    Get Bool
   | -- | Perform Common name checking in peer certificate (1=> existence;2=> matches hostname.)
-    CurlSSLVerifyHost Long
+    SslVerifyHost Word32
   | -- | Path to file where additional cookie information will be stored.
-    CurlCookieJar FilePath
+    CookieJar FilePath
   | -- | Colon-separated string list of cipher preferences to use for upcoming connection (e.g., "3DES:+RSA")
-    CurlSSLCipherList String
+    SslCipherList String
   | -- | What HTTP version to use, should you want to drop back for some reason.
-    CurlHttpVersion HttpVersion
+    HttpVersion HttpVersion
   | -- | Attempt the use of EPSV before PASV for passive FTP downloads.
-    CurlFtpUseEPSV Bool
+    FtpUseEPSV Bool
   | -- | The format of your certificates ("PEM", "DER")
-    CurlSSLCertType String
+    SslCertType String
   | -- | Filename of private key.
-    CurlSSLKey FilePath
+    SslKey FilePath
   | -- | Format of private key; use "ENG" to load from a crypto engine.
-    CurlSSLKeyType String
+    SslKeyType String
   | -- | Name of crypto engine to use.
-    CurlSSLEngine String
+    SslEngine String
   | -- | Make crypto engine the default for crypto operations.
-    CurlSSLEngineDefault
-  | -- | Have library uses its MT-unfriendly DNS global cache.
-    CurlDNSUseGlobalCache Bool
-  | -- | Number of seconds to cache results of DNS lookups in memory.
-    CurlDNSCacheTimeout Long
+    SslEngineDefault
+  | -- | Have library uses its MT-unfriendly Dns global cache.
+    DnsUseGlobalCache Bool
+  | -- | Number of seconds to cache results of Dns lookups in memory.
+    DnsCacheTimeout Word32
   | -- | FTP commands to issue after connection and transfer mode has been set.
-    CurlPreQuote [String]
+    PreQuote [String]
   | -- | callback to catch and report transfer operations.
-    CurlDebugFunction DebugFunction
+    DebugFunc DebugFunction
   | -- | state argument to pass to debug callback.
-    CurlDebugData (Ptr ())
+    DebugData (Ptr ())
   | -- | Signal the start of a cookie session, ignoring previous session cookies.
-    CurlCookieSession Bool
-  | -- | Directory holding CA certificates; used when verifying peer certificate.
-    CurlCAPath FilePath
+    CookieSession Bool
+  | -- | Directory holding Ca certificates; used when verifying peer certificate.
+    CaPath FilePath
   | -- | Turn (down, presumably) the buffers the received data is chunked up into (and reported to the WriteFunction.) A hint, library is free to ignore.
-    CurlBufferSize Long
+    BufferSize Word32
   | -- | Turn off use of signals internally.
-    CurlNoSignal Bool
-  | -- | Share handles are used for sharing data among concurrent Curl objects.
-    CurlShare (Ptr ())
+    NoSignal Bool
+  | -- | Share handles are used for sharing data among concurrent  objects.
+    Share (Ptr ())
   | -- | What type of proxy to use.
-    CurlProxyType Long
+    ProxyType Word32
   | -- | What to report in the Accept-Encoding: header
-    CurlEncoding String
-  | -- | Data associated with a Curl handle.
-    CurlPrivate (Ptr ())
+    Encoding String
+  | -- | Data associated with a  handle.
+    Private (Ptr ())
   | -- | Alternatives to standard 200 OK response strings; whatever it takes, I suppose.
-    CurlHttp200Aliases String
+    Http200Aliases String
   | -- | Pass on user:pass when following redirects.
-    CurlUnrestrictedAuth Bool
+    UnrestrictedAuth Bool
   | -- | For active FTP downloads, try using EPRT command over LPRT.
-    CurlFtppUseEPRT Bool
+    FtppUseEPRT Bool
   | -- | State your authentication preferences.
-    CurlHttpAuth [HttpAuth]
-  | -- | callback to handle setting up SSL connections; have the power to abort them.
-    CurlSSLCtxFunction SSLCtxtFunction
+    Auth [HttpAuth]
+  | -- | callback to handle setting up Ssl connections; have the power to abort them.
+    SslCtxFunction SslCtxtFunction
   | -- | state argument to pass into the above callback.
-    CurlSSLCtxData (Ptr ())
+    SslCtxData (Ptr ())
   | -- | Have remote directories be created if not already there
-    CurlFtpCreateMissingDirs Bool
+    FtpCreateMissingDirs Bool
   | -- | What preferred authentication schemes to use wrt. proxy.
-    CurlProxyAuth [HttpAuth]
+    ProxyAuth [HttpAuth]
   | -- | max number of seconds to wait for remote server to ACK commands.
-    CurlFtpResponseTimeout Long
+    FtpResponseTimeout Word32
   | -- | Whether to resolve wrt IPv4 or IPv6.
-    CurlIPResolve Long
+    IPResolve Word32
   | -- | Limit the number of bytes you're willing to download.
-    CurlMaxFileSize Long
+    MaxFileSize Word32
   | -- | Wider alternative of option giving upper bound of uploaded content (-1 => unknown.)
-    CurlInFileSizeLarge LLong
+    InFileSizeLarge Word64
   | -- | Wider alternative for specifying initial transfer offset.
-    CurlResumeFromLarge LLong
+    ResumeFromLarge Word64
   | -- | Wider alternative for specifying max download size.
-    CurlMaxFileSizeLarge LLong
+    MaxFileSizeLarge Word64
   | -- | Path to user\'s .netrc
-    CurlNetrcFile FilePath
-  | -- | Try enabling the use of SSL for FTP control connections and\/or transfers.
-    CurlFtpSSL Long
+    NetrcFile FilePath
+  | -- | Try enabling the use of Ssl for FTP control connections and\/or transfers.
+    FtpSsl Word32
   | -- | Size of data to POST; if unspecified (or -1), curl uses strlen().
-    CurlPostFieldSizeLarge LLong
+    PostFieldSizeLarge Word64
   | -- | Turn on or off the TCP\/IP NODELAY option.
-    CurlTCPNoDelay Bool
-  | -- | Twiddle if TLS or SSL is used.
-    CurlFtpSSLAuth Long
+    TcpNoDelay Bool
+  | -- | Twiddle if TLS or Ssl is used.
+    FtpSslAuth Word32
   | -- | somewhat obscure callback for handling read stream resets.
-    CurlIOCTLFunction (Ptr ())
+    IoctlFunction (Ptr ())
   | -- | state argument to the above.
-    CurlIOCTLData (Ptr ())
+    IoctlData (Ptr ())
   | -- | The string to use when server asks for account info.
-    CurlFtpAccount String
+    FtpAccount String
   | -- | Cookie string to pass cookie engine; "ALL" scrubs all cookie info; "SESS" scrubs session ones.
-    CurlCookieList String
+    CookieList String
   | -- | If Content-Length: values are troublesome (wrong, perhaps?), use this option to ignore using them as guidance.
-    CurlIgnoreContentLength Bool
+    IgnoreContentLength Bool
   | -- | Ignore IP address in 227 responses.
-    CurlFtpSkipPASVIP Bool
+    FtpSkipPASVIP Bool
   | -- | How to navigate to a file on the remote server (single, multiple CWDs).
-    CurlFtpFileMethod Long
+    FtpFileMethod Word32
   | -- | What local port to use for established connection.
-    CurlLocalPort Port
+    LocalPort Port
   | -- | Number of attempts at finding local ports (using LocalPort as initial base.)
-    CurlLocalPortRange Port
+    LocalPortRange Port
   | -- | If enabled, perform all steps up until actual transfer.
-    CurlConnectOnly Bool
+    ConnectOnly Bool
   | -- | callback for doing character translations from network format.
-    CurlConvFromNetworkFunction (Ptr ())
+    ConvFromNetworkFunction (Ptr ())
   | -- | callback for doing character translations to network format.
-    CurlConvToNetworkFunction (Ptr ())
+    ConvToNetworkFunction (Ptr ())
   | -- | callback for translating UTF8 into host encoding.
-    CurlConvFromUtf8Function (Ptr ())
+    ConvFromUtf8Function (Ptr ())
   | -- | Specifies throttle value for outgoing data.
-    CurlMaxSendSpeedLarge LLong
+    MaxSendSpeedLarge Word64
   | -- | Specifies throttle for incoming data.
-    CurlMaxRecvSpeedLarge LLong
+    MaxRecvSpeedLarge Word64
   | -- | Alternative (to user:pass) for FTP authentication; weird.
-    CurlFtpAlternativeToUser String
+    FtpAlternativeToUser String
   | -- | callback that's injected between socket creation and connection.
-    CurlSockOptFunction (Ptr ())
+    SockOptFunction (Ptr ())
   | -- | state argument to the above.
-    CurlSockOptData (Ptr ())
-  | -- | Enable the SSL session id cache; default is on, so use this to disable.
-    CurlSSLSessionIdCache Bool
-  | -- | SSH authentication methods to use.
-    CurlSSHAuthTypes [SSHAuthType]
-  | -- | Path to file holding user's SSH public key.
-    CurlSSHPublicKeyFile FilePath
-  | -- | Path to file holding user's SSH private key.
-    CurlSSHPrivateKeyFile FilePath
-  | -- | Send CCC command after FTP connection has been authenticated.
-    CurlFtpSSLCCC Bool
+    SockOptData (Ptr ())
+  | -- | Enable the Ssl session id cache; default is on, so use this to disable.
+    SslSessionIdCache Bool
+  | -- | Ssh authentication methods to use.
+    SshAuthTypes [SshAuthType]
+  | -- | Path to file holding user's Ssh public key.
+    SshPublicKeyFile FilePath
+  | -- | Path to file holding user's Ssh private key.
+    SshPrivateKeyFile FilePath
+  | -- | Send Ccc command after FTP connection has been authenticated.
+    FtpSslCcc Bool
   | -- | Max number of milliseconds that a transfer may take.
-    CurlTimeoutMS Long
+    TimeoutMS Word32
   | -- | Max number of milliseconds that a connection attempt may take to complete.
-    CurlConnectTimeoutMS Long
+    ConnectTimeoutMS Word32
   | -- | Disable transfer decoding; if disabled, curl will turn off chunking.
-    CurlHttpTransferDecoding Bool
+    HttpTransferDecoding Bool
   | -- | Disable content decoding, getting the raw bits.
-    CurlHttpContentDecoding Bool
-  | CurlNewFilePerms Long
-  | CurlNewDirectoryPerms Long
-  | CurlPostRedirect Bool
-  | CurlSSHHostPublicKeyMD5 String
-  | CurlCopyPostFields Bool
-  | CurlProxyTransferMode Long
-  | CurlCRLFile FilePath
-  | CurlIssuerCert FilePath
-  | CurlAddressScope Long
-  | CurlCertInfo Long
-  | CurlUserName String
-  | CurlUserPassword String
-  | CurlProxyUser String
-  | CurlProxyPassword String
-
-instance Show CurlOption where
-  show x = showCurlOption x
+    HttpContentDecoding Bool
+  | NewFilePerms Word32
+  | NewDirectoryPerms Word32
+  | PostRedirect Bool
+  | SshHostPublicKeyMD5 String
+  | CopyPostFields Bool
+  | ProxyTransferMode Word32
+  | CrlFile FilePath
+  | IssuerCert FilePath
+  | AddressScope Word32
+  | CertInfo Word32
+  | UserName String
+  | UserPassword String
+  | ProxyUser String
+  | ProxyPassword String
+  deriving stock (Show)
 
 data HttpVersion
   = HttpVersionNone
   | HttpVersion10
   | HttpVersion11
-  deriving (Enum, Show)
+  deriving stock (Show, Eq, Generic, Ord, Enum)
 
 data TimeCond
   = TimeCondNone
   | TimeCondIfModSince
   | TimeCondIfUnmodSince
   | TimeCondLastMode
-  deriving (Enum, Show)
+  deriving stock (Show, Eq, Generic, Ord, Enum)
 
 data NetRcOption
   = NetRcIgnored
   | NetRcOptional
   | NetRcRequired
-  deriving (Enum, Show)
+  deriving stock (Show, Eq, Generic, Ord, Enum)
 
 data HttpAuth
   = HttpAuthNone
@@ -348,9 +348,9 @@ data HttpAuth
   | HttpAuthNTLM
   | HttpAuthAny
   | HttpAuthAnySafe
-  deriving (Enum, Show)
+  deriving stock (Show, Eq, Generic, Ord, Enum)
 
-toHttpAuthMask :: [HttpAuth] -> Long
+toHttpAuthMask :: [HttpAuth] -> Word32
 toHttpAuthMask [] = 0
 toHttpAuthMask (x : xs) =
   let vs = toHttpAuthMask xs
@@ -360,43 +360,49 @@ toHttpAuthMask (x : xs) =
         HttpAuthDigest -> 0x2 .|. vs
         HttpAuthGSSNegotiate -> 0x4 .|. vs
         HttpAuthNTLM -> 0x8 .|. vs
-        HttpAuthAny -> (complement 0) .|. vs
-        HttpAuthAnySafe -> (complement 1) .|. vs
+        HttpAuthAny -> complement 0 .|. vs
+        HttpAuthAnySafe -> complement 1 .|. vs
 
-data SSHAuthType
-  = SSHAuthAny
-  | SSHAuthNone
-  | SSHAuthPublickey
-  | SSHAuthPassword
-  | SSHAuthHost
-  | SSHAuthKeyboard
-  deriving (Show)
+data SshAuthType
+  = SshAuthAny
+  | SshAuthNone
+  | SshAuthPublickey
+  | SshAuthPassword
+  | SshAuthHost
+  | SshAuthKeyboard
+  deriving stock (Show)
 
-toSSHAuthMask :: [SSHAuthType] -> Long
-toSSHAuthMask [] = 0
-toSSHAuthMask (x : xs) =
-  let vs = toSSHAuthMask xs
+toSshAuthMask :: [SshAuthType] -> Word32
+toSshAuthMask [] = 0
+toSshAuthMask (x : xs) =
+  let vs = toSshAuthMask xs
    in case x of
-        SSHAuthAny -> (complement 0) .|. vs
-        SSHAuthNone -> vs
-        SSHAuthPublickey -> 1 .|. vs
-        SSHAuthPassword -> 2 .|. vs
-        SSHAuthHost -> 4 .|. vs
-        SSHAuthKeyboard -> 8 .|. vs
+        SshAuthAny -> complement 0 .|. vs
+        SshAuthNone -> vs
+        SshAuthPublickey -> 1 .|. vs
+        SshAuthPassword -> 2 .|. vs
+        SshAuthHost -> 4 .|. vs
+        SshAuthKeyboard -> 8 .|. vs
 
-type WriteFunction =
-  Ptr CChar -> --  pointer to external buffer holding data
-  CInt -> --  width (in bytes) of each item
-  CInt -> --  number of items
-  Ptr () -> --  state argument (file pointer etc.)
-  IO CInt --  number of bytes written.
+newtype WriteFunction
+  = WriteFunction
+      ( Ptr CChar -> --  pointer to external buffer holding data
+        CInt -> --  width (in bytes) of each item
+        CInt -> --  number of items
+        Ptr () -> --  state argument (file pointer etc.)
+        IO CInt --  number of bytes written.
+      )
+  deriving (Show) via (ShowFun WriteFunction)
 
-type ReadFunction =
-  Ptr CChar -> --  pointer to external buffer to fill in.
-  CInt -> --  width (in bytes) of each item
-  CInt -> --  number of items
-  Ptr () -> --  state argument (file pointer etc.)
-  IO (Maybe CInt) --  how many bytes was copied into buffer; Nothing => abort.
+newtype ReadFunction
+  = ReadFunction
+      ( Ptr CChar -> --  pointer to external buffer to fill in.
+        CInt -> --  width (in bytes) of each item
+        CInt -> --  number of items
+        Ptr () -> --  state argument (file pointer etc.)
+        IO (Maybe CInt) --  how many bytes was copied into buffer; Nothing => abort.
+      )
+  deriving (Show) via (ShowFun ReadFunction)
 
 type ReadFunctionPrim =
   Ptr CChar ->
@@ -405,31 +411,27 @@ type ReadFunctionPrim =
   Ptr () ->
   IO CInt
 
-type ProgressFunction =
-  Ptr () -> --  state argument
-  Double -> --  expected download totals
-  Double -> --  download totals so far
-  Double -> --  expected upload totals
-  Double -> --  upload totals so far
-  IO CInt --  not sure; 0 is a good one.
+newtype ProgressFunction
+  = ProgressFunction
+      ( Ptr () -> --  state argument
+        Double -> --  expected download totals
+        Double -> --  download totals so far
+        Double -> --  expected upload totals
+        Double -> --  upload totals so far
+        IO CInt --  not sure; 0 is a good one.
+      )
+  deriving (Show) via (ShowFun ProgressFunction)
 
-type DebugFunction =
-  Curl -> --  connection handle
-  DebugInfo -> --  type of call
-  Ptr CChar -> --  data buffer
-  CInt -> --  length of buffer
-  Ptr () -> --  state argument
-  IO () --  always 0
-
-data DebugInfo
-  = InfoText
-  | InfoHeaderIn
-  | InfoHeaderOut
-  | InfoDataIn
-  | InfoDataOut
-  | InfoSslDataIn
-  | InfoSslDataOut
-  deriving (Eq, Enum)
+newtype DebugFunction
+  = DebugFunction
+      ( Curl -> --  connection handle
+        DebugInfo -> --  type of call
+        Ptr CChar -> --  data buffer
+        CInt -> --  length of buffer
+        Ptr () -> --  state argument
+        IO () --  always 0
+      )
+  deriving (Show) via (ShowFun DebugFunction)
 
 type DebugFunctionPrim =
   CurlH -> --  connection handle
@@ -439,14 +441,32 @@ type DebugFunctionPrim =
   Ptr () -> --  state argument
   IO CInt --  always 0
 
-type SSLCtxtFunction =
-  CurlH -> --  connection handle
-  Ptr () -> --  the SSL_CTX handle
-  Ptr () -> --  state argument
-  IO CInt
+newtype SslCtxtFunction
+  = SslCtxtFunction
+      ( CurlH -> --  connection handle
+        Ptr () -> --  the Ssl_CTX handle
+        Ptr () -> --  state argument
+        IO CInt
+      )
+  deriving (Show) via (ShowFun SslCtxtFunction)
 
-curl_readfunc_abort :: CInt
-curl_readfunc_abort = 0x10000000
+newtype ShowFun a = ShowFun a
+
+instance Show (ShowFun a) where
+  show _ = "<fun>"
+
+data DebugInfo
+  = InfoText
+  | InfoHeaderIn
+  | InfoHeaderOut
+  | InfoDataIn
+  | InfoDataOut
+  | InfoSslDataIn
+  | InfoSslDataOut
+  deriving stock (Show, Eq, Generic, Ord, Enum)
+
+curlReadfuncAbort :: CInt
+curlReadfuncAbort = 0x10000000
 
 baseLong :: Int
 baseLong = 0
@@ -461,373 +481,201 @@ baseOffT :: Int
 baseOffT = 30000
 
 unmarshallOption :: Unmarshaller a -> CurlOption -> IO a
-unmarshallOption um c =
-  let l = (baseLong +)
-      o = (baseObject +)
-      f = (baseFunction +)
-      off = (baseOffT +)
-   in case c of
-        CurlFileObj x -> u_ptr um (o 1) x
-        CurlURL x -> u_string um (o 2) x
-        CurlPort x -> u_long um (l 3) x
-        CurlProxy x -> u_string um (o 4) x
-        CurlUserPwd x -> u_string um (o 5) x
-        CurlProxyUserPwd x -> u_string um (o 6) x
-        CurlRange x -> u_string um (o 7) x
-        CurlInFile x -> u_string um (o 9) x
-        CurlErrorBuffer x -> u_cptr um (o 10) x
-        CurlWriteFunction x -> u_writeFun um (f 11) x
-        CurlReadFunction x -> u_readFun um (f 12) x
-        CurlTimeout x -> u_long um (l 13) x
-        CurlInFileSize x -> u_long um (l 14) x
-        CurlPostFields x -> u_string um (o 15) (concat $ intersperse "&" x)
-        CurlReferer x -> u_string um (o 16) x
-        CurlFtpPort x -> u_string um (o 17) x
-        CurlUserAgent x -> u_string um (o 18) x
-        CurlLowSpeed x -> u_long um (l 19) x
-        CurlLowSpeedTime x -> u_long um (l 20) x
-        CurlResumeFrom x -> u_long um (l 21) x
-        CurlCookie x -> u_string um (o 22) x
-        CurlHttpHeaders x -> u_strings um (o 23) x
-        CurlHttpPost x -> u_posts um (o 24) x
-        CurlSSLCert x -> u_string um (o 25) x
-        CurlSSLPassword x -> u_string um (o 26) x
-        CurlSSLKeyPassword x -> u_string um (o 26) x -- yes, duplicate.
-        CurlCRLF x -> u_bool um (l 27) x
-        CurlQuote x -> u_strings um (o 28) x
-        CurlWriteHeader x -> u_ptr um (o 29) x
-        CurlCookieFile x -> u_string um (o 31) x
-        CurlSSLVersion x -> u_long um (l 32) x
-        CurlTimeCondition x -> u_enum um (l 33) x
-        CurlTimeValue x -> u_long um (l 34) x
-        CurlCustomRequest x -> u_string um (o 36) x
-        -- CurlStderr x -> u_string um (o 37) x
-        CurlPostQuote x -> u_strings um (o 39) x
-        CurlWriteInfo x -> u_string um (o 40) x
-        CurlVerbose x -> u_bool um (l 41) x
-        CurlHeader x -> u_bool um (l 42) x
-        CurlNoProgress x -> u_bool um (l 43) x
-        CurlNoBody x -> u_bool um (l 44) x
-        CurlFailOnError x -> u_bool um (l 45) x
-        CurlUpload x -> u_bool um (l 46) x
-        CurlPost x -> u_bool um (l 47) x
-        CurlFtpListOnly x -> u_bool um (l 48) x
-        CurlFtpAppend x -> u_bool um (l 50) x
-        CurlUseNetRc x -> u_enum um (l 51) x
-        CurlFollowLocation x -> u_bool um (l 52) x
-        CurlTransferTextASCII x -> u_bool um (l 53) x
-        CurlPut x -> u_bool um (l 54) x
-        CurlProgressFunction x -> u_progressFun um (f 56) x
-        CurlProgressData x -> u_ptr um (o 57) x
-        CurlAutoReferer x -> u_bool um (l 58) x
-        CurlProxyPort x -> u_long um (l 59) x
-        CurlPostFieldSize x -> u_long um (l 60) x
-        CurlHttpProxyTunnel x -> u_bool um (l 61) x
-        CurlInterface x -> u_string um (o 62) x
-        CurlKrb4Level x -> u_string um (o 63) x
-        CurlSSLVerifyPeer x -> u_bool um (l 64) x
-        CurlCAInfo x -> u_string um (o 65) x
-        CurlMaxRedirs x -> u_long um (l 68) x
-        CurlFiletime x -> u_bool um (l 69) x
-        CurlTelnetOptions x -> u_strings um (o 70) x
-        CurlMaxConnects x -> u_long um (l 71) x
-        CurlClosePolicy x -> u_long um (l 72) x
-        CurlFreshConnect x -> u_bool um (l 74) x
-        CurlForbidReuse x -> u_bool um (l 75) x
-        CurlRandomFile x -> u_string um (o 76) x
-        CurlEgdSocket x -> u_string um (o 77) x
-        CurlConnectTimeout x -> u_long um (l 78) x
-        CurlHeaderFunction x -> u_writeFun um (f 79) x
-        CurlHttpGet x -> u_bool um (l 80) x
-        CurlSSLVerifyHost x -> u_long um (l 81) x
-        CurlCookieJar x -> u_string um (o 82) x
-        CurlSSLCipherList x -> u_string um (o 83) x -- a string (or a l-list of them)?
-        CurlHttpVersion x -> u_enum um (l 84) x
-        CurlFtpUseEPSV x -> u_bool um (l 85) x
-        CurlSSLCertType x -> u_string um (o 86) x
-        CurlSSLKey x -> u_string um (o 87) x
-        CurlSSLKeyType x -> u_string um (o 88) x
-        CurlSSLEngine x -> u_string um (o 89) x
-        CurlSSLEngineDefault -> u_bool um (l 90) True
-        CurlDNSUseGlobalCache x -> u_bool um (l 91) x
-        CurlDNSCacheTimeout x -> u_long um (l 92) x
-        CurlPreQuote x -> u_strings um (o 93) x
-        CurlDebugFunction x -> u_debugFun um (f 94) x
-        CurlDebugData x -> u_ptr um (o 95) x
-        CurlCookieSession x -> u_bool um (l 96) x
-        CurlCAPath x -> u_string um (o 97) x
-        CurlBufferSize x -> u_long um (l 98) x
-        CurlNoSignal x -> u_bool um (l 99) x
-        CurlShare x -> u_ptr um (o 100) x
-        CurlProxyType x -> u_enum um (l 101) x
-        CurlEncoding x -> u_string um (o 102) x
-        CurlPrivate x -> u_ptr um (o 103) x
-        CurlHttp200Aliases x -> u_string um (o 104) x -- correct?
-        CurlUnrestrictedAuth x -> u_bool um (l 105) x
-        CurlFtppUseEPRT x -> u_bool um (l 106) x
-        CurlHttpAuth xs -> u_long um (l 107) (toHttpAuthMask xs)
-        CurlSSLCtxFunction x -> u_sslctxt um (f 108) x
-        CurlSSLCtxData x -> u_ptr um (o 109) x
-        CurlFtpCreateMissingDirs x -> u_bool um (l 110) x
-        CurlProxyAuth x -> u_long um (l 111) (toHttpAuthMask x)
-        CurlFtpResponseTimeout x -> u_long um (l 112) x
-        CurlIPResolve x -> u_long um (l 113) x
-        CurlMaxFileSize x -> u_long um (l 114) x
-        CurlInFileSizeLarge x -> u_llong um (off 115) x
-        CurlResumeFromLarge x -> u_llong um (off 116) x
-        CurlMaxFileSizeLarge x -> u_llong um (off 117) x
-        CurlNetrcFile x -> u_string um (o 118) x
-        CurlFtpSSL x -> u_enum um (l 119) x
-        CurlPostFieldSizeLarge x -> u_llong um (off 120) x
-        CurlTCPNoDelay x -> u_bool um (l 121) x
-        CurlFtpSSLAuth x -> u_enum um (l 129) x
-        CurlIOCTLFunction x -> u_ioctl_fun um (f 130) x
-        CurlIOCTLData x -> u_ptr um (o 131) x
-        CurlFtpAccount x -> u_string um (o 134) x
-        CurlCookieList x -> u_string um (o 135) x
-        CurlIgnoreContentLength x -> u_bool um (l 136) x
-        CurlFtpSkipPASVIP x -> u_bool um (l 137) x
-        CurlFtpFileMethod x -> u_enum um (l 138) x
-        CurlLocalPort x -> u_long um (l 139) x
-        CurlLocalPortRange x -> u_long um (l 140) x
-        CurlConnectOnly x -> u_bool um (l 141) x
-        CurlConvFromNetworkFunction x -> u_convFromNetwork um (f 142) x
-        CurlConvToNetworkFunction x -> u_convToNetwork um (f 143) x
-        CurlConvFromUtf8Function x -> u_convFromUtf8 um (f 144) x
-        CurlMaxSendSpeedLarge x -> u_llong um (off 145) x
-        CurlMaxRecvSpeedLarge x -> u_llong um (off 146) x
-        CurlFtpAlternativeToUser x -> u_string um (o 147) x
-        CurlSockOptFunction x -> u_sockoptFun um (f 148) x
-        CurlSockOptData x -> u_ptr um (o 149) x
-        CurlSSLSessionIdCache x -> u_bool um (l 150) x
-        CurlSSHAuthTypes xs -> u_long um (l 151) (toSSHAuthMask xs)
-        CurlSSHPublicKeyFile x -> u_string um (o 152) x
-        CurlSSHPrivateKeyFile x -> u_string um (o 153) x
-        CurlFtpSSLCCC x -> u_bool um (l 154) x
-        CurlTimeoutMS x -> u_long um (l 155) x
-        CurlConnectTimeoutMS x -> u_long um (l 156) x
-        CurlHttpTransferDecoding x -> u_bool um (l 157) x
-        CurlHttpContentDecoding x -> u_bool um (l 158) x
-        CurlNewFilePerms x -> u_long um (l 159) x
-        CurlNewDirectoryPerms x -> u_long um (l 160) x
-        CurlPostRedirect x -> u_bool um (l 161) x
-        CurlSSHHostPublicKeyMD5 x -> u_string um (l 162) x
-        CurlCopyPostFields x -> u_bool um (l 165) x
-        CurlProxyTransferMode x -> u_long um (l 166) x
-        CurlCRLFile x -> u_string um (l 169) x
-        CurlIssuerCert x -> u_string um (l 170) x
-        CurlAddressScope x -> u_long um (l 171) x
-        CurlCertInfo x -> u_long um (l 172) x
-        CurlUserName x -> u_string um (l 173) x
-        CurlUserPassword x -> u_string um (l 174) x
-        CurlProxyUser x -> u_string um (l 175) x
-        CurlProxyPassword x -> u_string um (l 176) x
+unmarshallOption um@Unmarshaller {..} = \case
+  FileObj x -> pointer (withObject 1) x
+  Url x -> string (withObject 2) x
+  Port x -> long (withLong 3) x
+  Proxy x -> string (withObject 4) x
+  UserPwd x -> string (withObject 5) x
+  ProxyUserPwd x -> string (withObject 6) x
+  Range x -> string (withObject 7) x
+  InFile x -> string (withObject 9) x
+  ErrorBuffer x -> unmarshalCptr um (withObject 10) x
+  WriteFunc x -> writeFun (withFunc 11) x
+  ReadFunc x -> readFun (withFunc 12) x
+  Timeout x -> long (withLong 13) x
+  InFileSize x -> long (withLong 14) x
+  PostFields x -> string (withObject 15) $ intercalate "&" x
+  Referer x -> string (withObject 16) x
+  FtpPort x -> string (withObject 17) x
+  UserAgent x -> string (withObject 18) x
+  LowSpeed x -> long (withLong 19) x
+  LowSpeedTime x -> long (withLong 20) x
+  ResumeFrom x -> long (withLong 21) x
+  Cookie x -> string (withObject 22) x
+  HttpHeaders x -> strings (withObject 23) x
+  Multipart x -> posts (withObject 24) x
+  SslCert x -> string (withObject 25) x
+  SslPassword x -> string (withObject 26) x
+  SslKeyPassword x -> string (withObject 26) x -- yes, duplicate.
+  Crlf x -> unmarshalBool um (withLong 27) x
+  Quote x -> strings (withObject 28) x
+  WriteHeader x -> pointer (withObject 29) x
+  CookieFile x -> string (withObject 31) x
+  SslVersion x -> long (withLong 32) x
+  TimeCondition x -> unmarshalEnum um (withLong 33) x
+  TimeValue x -> long (withLong 34) x
+  CustomRequest x -> string (withObject 36) x
+  PostQuote x -> strings (withObject 39) x
+  WriteInfo x -> string (withObject 40) x
+  Verbose x -> unmarshalBool um (withLong 41) x
+  Header x -> unmarshalBool um (withLong 42) x
+  NoProgress x -> unmarshalBool um (withLong 43) x
+  NoBody x -> unmarshalBool um (withLong 44) x
+  FailOnError x -> unmarshalBool um (withLong 45) x
+  Upload x -> unmarshalBool um (withLong 46) x
+  Post x -> unmarshalBool um (withLong 47) x
+  FtpListOnly x -> unmarshalBool um (withLong 48) x
+  FtpAppend x -> unmarshalBool um (withLong 50) x
+  UseNetRc x -> unmarshalEnum um (withLong 51) x
+  FollowLocation x -> unmarshalBool um (withLong 52) x
+  TransferTextASCII x -> unmarshalBool um (withLong 53) x
+  Put x -> unmarshalBool um (withLong 54) x
+  ProgressFunc x -> progressFun (withFunc 56) x
+  ProgressData x -> pointer (withObject 57) x
+  AutoReferer x -> unmarshalBool um (withLong 58) x
+  ProxyPort x -> long (withLong 59) x
+  PostFieldSize x -> long (withLong 60) x
+  HttpProxyTunnel x -> unmarshalBool um (withLong 61) x
+  Interface x -> string (withObject 62) x
+  Krb4Level x -> string (withObject 63) x
+  SslVerifyPeer x -> unmarshalBool um (withLong 64) x
+  CaInfo x -> string (withObject 65) x
+  MaxRedirs x -> long (withLong 68) x
+  Filetime x -> unmarshalBool um (withLong 69) x
+  TelnetOptions x -> strings (withObject 70) x
+  MaxConnects x -> long (withLong 71) x
+  ClosePolicy x -> long (withLong 72) x
+  FreshConnect x -> unmarshalBool um (withLong 74) x
+  ForbidReuse x -> unmarshalBool um (withLong 75) x
+  RandomFile x -> string (withObject 76) x
+  EgdSocket x -> string (withObject 77) x
+  ConnectTimeout x -> long (withLong 78) x
+  HeaderFunction x -> writeFun (withFunc 79) x
+  Get x -> unmarshalBool um (withLong 80) x
+  SslVerifyHost x -> long (withLong 81) x
+  CookieJar x -> string (withObject 82) x
+  SslCipherList x -> string (withObject 83) x -- a string (withObjectr a withLong-list of them)?
+  HttpVersion x -> unmarshalEnum um (withLong 84) x
+  FtpUseEPSV x -> unmarshalBool um (withLong 85) x
+  SslCertType x -> string (withObject 86) x
+  SslKey x -> string (withObject 87) x
+  SslKeyType x -> string (withObject 88) x
+  SslEngine x -> string (withObject 89) x
+  SslEngineDefault -> unmarshalBool um (withLong 90) True
+  DnsUseGlobalCache x -> unmarshalBool um (withLong 91) x
+  DnsCacheTimeout x -> long (withLong 92) x
+  PreQuote x -> strings (withObject 93) x
+  DebugFunc x -> debugFun (withFunc 94) x
+  DebugData x -> pointer (withObject 95) x
+  CookieSession x -> unmarshalBool um (withLong 96) x
+  CaPath x -> string (withObject 97) x
+  BufferSize x -> long (withLong 98) x
+  NoSignal x -> unmarshalBool um (withLong 99) x
+  Share x -> pointer (withObject 100) x
+  ProxyType x -> unmarshalEnum um (withLong 101) x
+  Encoding x -> string (withObject 102) x
+  Private x -> pointer (withObject 103) x
+  Http200Aliases x -> string (withObject 104) x -- correct?
+  UnrestrictedAuth x -> unmarshalBool um (withLong 105) x
+  FtppUseEPRT x -> unmarshalBool um (withLong 106) x
+  Auth xs -> long (withLong 107) (toHttpAuthMask xs)
+  SslCtxFunction x -> sslctxt (withFunc 108) x
+  SslCtxData x -> pointer (withObject 109) x
+  FtpCreateMissingDirs x -> unmarshalBool um (withLong 110) x
+  ProxyAuth x -> long (withLong 111) (toHttpAuthMask x)
+  FtpResponseTimeout x -> long (withLong 112) x
+  IPResolve x -> long (withLong 113) x
+  MaxFileSize x -> long (withLong 114) x
+  InFileSizeLarge x -> llong (withOffset 115) x
+  ResumeFromLarge x -> llong (withOffset 116) x
+  MaxFileSizeLarge x -> llong (withOffset 117) x
+  NetrcFile x -> string (withObject 118) x
+  FtpSsl x -> unmarshalEnum um (withLong 119) x
+  PostFieldSizeLarge x -> llong (withOffset 120) x
+  TcpNoDelay x -> unmarshalBool um (withLong 121) x
+  FtpSslAuth x -> unmarshalEnum um (withLong 129) x
+  IoctlFunction x -> ioctlFun (withFunc 130) x
+  IoctlData x -> pointer (withObject 131) x
+  FtpAccount x -> string (withObject 134) x
+  CookieList x -> string (withObject 135) x
+  IgnoreContentLength x -> unmarshalBool um (withLong 136) x
+  FtpSkipPASVIP x -> unmarshalBool um (withLong 137) x
+  FtpFileMethod x -> unmarshalEnum um (withLong 138) x
+  LocalPort x -> long (withLong 139) x
+  LocalPortRange x -> long (withLong 140) x
+  ConnectOnly x -> unmarshalBool um (withLong 141) x
+  ConvFromNetworkFunction x -> convFromNetwork (withFunc 142) x
+  ConvToNetworkFunction x -> convToNetwork (withFunc 143) x
+  ConvFromUtf8Function x -> convFromUtf8 (withFunc 144) x
+  MaxSendSpeedLarge x -> llong (withOffset 145) x
+  MaxRecvSpeedLarge x -> llong (withOffset 146) x
+  FtpAlternativeToUser x -> string (withObject 147) x
+  SockOptFunction x -> sockoptFun (withFunc 148) x
+  SockOptData x -> pointer (withObject 149) x
+  SslSessionIdCache x -> unmarshalBool um (withLong 150) x
+  SshAuthTypes xs -> long (withLong 151) (toSshAuthMask xs)
+  SshPublicKeyFile x -> string (withObject 152) x
+  SshPrivateKeyFile x -> string (withObject 153) x
+  FtpSslCcc x -> unmarshalBool um (withLong 154) x
+  TimeoutMS x -> long (withLong 155) x
+  ConnectTimeoutMS x -> long (withLong 156) x
+  HttpTransferDecoding x -> unmarshalBool um (withLong 157) x
+  HttpContentDecoding x -> unmarshalBool um (withLong 158) x
+  NewFilePerms x -> long (withLong 159) x
+  NewDirectoryPerms x -> long (withLong 160) x
+  PostRedirect x -> unmarshalBool um (withLong 161) x
+  SshHostPublicKeyMD5 x -> string (withLong 162) x
+  CopyPostFields x -> unmarshalBool um (withLong 165) x
+  ProxyTransferMode x -> long (withLong 166) x
+  CrlFile x -> string (withLong 169) x
+  IssuerCert x -> string (withLong 170) x
+  AddressScope x -> long (withLong 171) x
+  CertInfo x -> long (withLong 172) x
+  UserName x -> string (withLong 173) x
+  UserPassword x -> string (withLong 174) x
+  ProxyUser x -> string (withLong 175) x
+  ProxyPassword x -> string (withLong 176) x
+  where
+    withLong :: Int -> Int
+    withLong = (baseLong +)
+
+    withObject :: Int -> Int
+    withObject = (baseObject +)
+
+    withFunc :: Int -> Int
+    withFunc = (baseFunction +)
+
+    withOffset :: Int -> Int
+    withOffset = (baseOffT +)
 
 data Unmarshaller a = Unmarshaller
-  { u_long :: Int -> Long -> IO a,
-    u_llong :: Int -> LLong -> IO a,
-    u_string :: Int -> String -> IO a,
-    u_strings :: Int -> [String] -> IO a,
-    u_ptr :: Int -> Ptr () -> IO a,
-    u_writeFun :: Int -> WriteFunction -> IO a,
-    u_readFun :: Int -> ReadFunction -> IO a,
-    u_progressFun :: Int -> ProgressFunction -> IO a,
-    u_debugFun :: Int -> DebugFunction -> IO a,
-    u_posts :: Int -> [HttpPost] -> IO a,
-    u_sslctxt :: Int -> SSLCtxtFunction -> IO a,
-    u_ioctl_fun :: Int -> Ptr () -> IO a,
-    u_convFromNetwork :: Int -> Ptr () -> IO a,
-    u_convToNetwork :: Int -> Ptr () -> IO a,
-    u_convFromUtf8 :: Int -> Ptr () -> IO a,
-    u_sockoptFun :: Int -> Ptr () -> IO a
+  { long :: Int -> Word32 -> IO a,
+    llong :: Int -> Word64 -> IO a,
+    string :: Int -> String -> IO a,
+    strings :: Int -> [String] -> IO a,
+    pointer :: Int -> Ptr () -> IO a,
+    writeFun :: Int -> WriteFunction -> IO a,
+    readFun :: Int -> ReadFunction -> IO a,
+    progressFun :: Int -> ProgressFunction -> IO a,
+    debugFun :: Int -> DebugFunction -> IO a,
+    posts :: Int -> [HttpPost] -> IO a,
+    sslctxt :: Int -> SslCtxtFunction -> IO a,
+    ioctlFun :: Int -> Ptr () -> IO a,
+    convFromNetwork :: Int -> Ptr () -> IO a,
+    convToNetwork :: Int -> Ptr () -> IO a,
+    convFromUtf8 :: Int -> Ptr () -> IO a,
+    sockoptFun :: Int -> Ptr () -> IO a
   }
 
-verboseUnmarshaller :: Unmarshaller a -> Unmarshaller a
-verboseUnmarshaller u =
-  let two m f x y = putStrLn m >> f u x y
-      twoS m f x y = putStrLn (m ++ ": " ++ show (x, y)) >> f u x y
-   in u
-        { u_long = twoS "u_long" u_long,
-          u_llong = twoS "u_llong" u_llong,
-          u_string = twoS "u_string" u_string,
-          u_strings = twoS "u_strings" u_strings,
-          u_ptr = twoS "u_ptr" u_ptr,
-          u_writeFun = two "u_writeFun" u_writeFun,
-          u_readFun = two "u_readFun" u_readFun,
-          u_progressFun = two "u_progressFun" u_progressFun,
-          u_debugFun = two "u_debugFun" u_debugFun,
-          u_posts = two "u_posts" u_posts,
-          u_sslctxt = two "u_sslctxt" u_sslctxt,
-          u_ioctl_fun = two "u_ioctl_fun" u_ioctl_fun,
-          u_convFromNetwork = twoS "u_convFromNetwork" u_convFromNetwork,
-          u_convToNetwork = twoS "u_convToNetwork" u_convToNetwork,
-          u_convFromUtf8 = twoS "u_convFromUtf8" u_convFromUtf8,
-          u_sockoptFun = twoS "u_sockoptFun" u_sockoptFun
-        }
+unmarshalBool :: Unmarshaller a -> Int -> Bool -> IO a
+unmarshalBool Unmarshaller {long} x =
+  long x . \case
+    True -> 1
+    False -> 0
 
-u_bool :: Unmarshaller a -> Int -> Bool -> IO a
-u_bool um x b = u_long um x (if b then 1 else 0)
+unmarshalEnum :: Enum b => Unmarshaller a -> Int -> b -> IO a
+unmarshalEnum Unmarshaller {long} x = long x . fromIntegral . fromEnum
 
-u_enum :: Enum b => Unmarshaller a -> Int -> b -> IO a
-u_enum um x b = u_long um x (fromIntegral $ fromEnum b)
-
-u_cptr :: Unmarshaller a -> Int -> Ptr CChar -> IO a
-u_cptr um x p = u_ptr um x (castPtr p)
-
-showCurlOption :: CurlOption -> String
-showCurlOption o =
-  case o of
-    CurlFileObj p -> "CurlFileObj " ++ show p
-    CurlURL u -> "CurlURL " ++ show u
-    CurlPort p -> "CurlPort " ++ show p
-    CurlProxy s -> "CurlProxy " ++ show s
-    CurlUserPwd p -> "CurlUserPwd " ++ show p
-    CurlProxyUserPwd p -> "CurlProxyUserPwd " ++ show p
-    CurlRange p -> "CurlRange " ++ show p
-    CurlInFile p -> "CurlInFile " ++ show p
-    CurlErrorBuffer p -> "CurlErrorBuffer " ++ show p
-    CurlWriteFunction {} -> "CurlWriteFunction <fun>"
-    CurlReadFunction {} -> "CurlReadFunction <fun>"
-    CurlTimeout l -> "CurlTimeout " ++ show l
-    CurlInFileSize l -> "CurlInFileSize " ++ show l
-    CurlPostFields p -> "CurlPostFields " ++ show p
-    CurlReferer p -> "CurlReferer " ++ show p
-    CurlFtpPort p -> "CurlFtpPort " ++ show p
-    CurlUserAgent p -> "CurlUserAgent " ++ show p
-    CurlLowSpeed p -> "CurlLowSpeed " ++ show p
-    CurlLowSpeedTime p -> "CurlLowSpeedTime " ++ show p
-    CurlResumeFrom p -> "CurlResumeFrom " ++ show p
-    CurlCookie p -> "CurlCookie " ++ show p
-    CurlHttpHeaders p -> "CurlHttpHeaders " ++ show p
-    CurlHttpPost p -> "CurlHttpPost " ++ show p
-    CurlSSLCert p -> "CurlSSLCert " ++ show p
-    CurlSSLPassword p -> "CurlSSLPassword " ++ show p
-    CurlSSLKeyPassword p -> "CurlSSLKeyPassword " ++ show p
-    CurlCRLF p -> "CurlCRLF " ++ show p
-    CurlQuote p -> "CurlQuote " ++ show p
-    CurlWriteHeader p -> "CurlWriteHeader " ++ show p
-    CurlCookieFile p -> "CurlCookieFile " ++ show p
-    CurlSSLVersion p -> "CurlSSLVersion " ++ show p
-    CurlTimeCondition p -> "CurlTimeCondition " ++ show p
-    CurlTimeValue p -> "CurlTimeValue " ++ show p
-    CurlCustomRequest p -> "CurlCustomRequest " ++ show p
-    CurlPostQuote p -> "CurlPostQuote " ++ show p
-    CurlWriteInfo p -> "CurlWriteInfo " ++ show p
-    CurlVerbose p -> "CurlVerbose " ++ show p
-    CurlHeader p -> "CurlHeader " ++ show p
-    CurlNoProgress p -> "CurlNoProgress " ++ show p
-    CurlNoBody p -> "CurlNoBody " ++ show p
-    CurlFailOnError p -> "CurlFailOnError " ++ show p
-    CurlUpload p -> "CurlUpload " ++ show p
-    CurlPost p -> "CurlPost " ++ show p
-    CurlFtpListOnly p -> "CurlFtpListOnly " ++ show p
-    CurlFtpAppend p -> "CurlFtpAppend " ++ show p
-    CurlUseNetRc p -> "CurlUseNetRc " ++ show p
-    CurlFollowLocation p -> "CurlFollowLocation " ++ show p
-    CurlTransferTextASCII p -> "CurlTransferTextASCII " ++ show p
-    CurlPut p -> "CurlPut " ++ show p
-    CurlProgressFunction {} -> "CurlProgressFunction <fun>"
-    CurlProgressData p -> "CurlProgressData " ++ show p
-    CurlAutoReferer p -> "CurlAutoReferer " ++ show p
-    CurlProxyPort p -> "CurlProxyPort " ++ show p
-    CurlPostFieldSize p -> "CurlPostFieldSize " ++ show p
-    CurlHttpProxyTunnel p -> "CurlHttpProxyTunnel " ++ show p
-    CurlInterface p -> "CurlInterface " ++ show p
-    CurlKrb4Level p -> "CurlKrb4Level " ++ show p
-    CurlSSLVerifyPeer p -> "CurlSSLVerifyPeer " ++ show p
-    CurlCAInfo p -> "CurlCAInfo " ++ show p
-    CurlMaxRedirs p -> "CurlMaxRedirs " ++ show p
-    CurlFiletime p -> "CurlFiletime " ++ show p
-    CurlTelnetOptions p -> "CurlTelnetOptions " ++ show p
-    CurlMaxConnects p -> "CurlMaxConnects " ++ show p
-    CurlClosePolicy p -> "CurlClosePolicy " ++ show p
-    CurlFreshConnect p -> "CurlFreshConnect " ++ show p
-    CurlForbidReuse p -> "CurlForbidReuse " ++ show p
-    CurlRandomFile p -> "CurlRandomFile " ++ show p
-    CurlEgdSocket p -> "CurlEgdSocket " ++ show p
-    CurlConnectTimeout p -> "CurlConnectTimeout " ++ show p
-    CurlHeaderFunction {} -> "CurlHeaderFunction <fun>"
-    CurlHttpGet p -> "CurlHttpGet " ++ show p
-    CurlSSLVerifyHost p -> "CurlSSLVerifyHost " ++ show p
-    CurlCookieJar p -> "CurlCookieJar " ++ show p
-    CurlSSLCipherList p -> "CurlSSLCipherList " ++ show p
-    CurlHttpVersion p -> "CurlHttpVersion " ++ show p
-    CurlFtpUseEPSV p -> "CurlFtpUseEPSV " ++ show p
-    CurlSSLCertType p -> "CurlSSLCertType " ++ show p
-    CurlSSLKey p -> "CurlSSLKey " ++ show p
-    CurlSSLKeyType p -> "CurlSSLKeyType " ++ show p
-    CurlSSLEngine p -> "CurlSSLEngine " ++ show p
-    CurlSSLEngineDefault -> "CurlSSLEngineDefault"
-    CurlDNSUseGlobalCache p -> "CurlDNSUseGlobalCache " ++ show p
-    CurlDNSCacheTimeout p -> "CurlDNSCacheTimeout " ++ show p
-    CurlPreQuote p -> "CurlPreQuote " ++ show p
-    CurlDebugFunction {} -> "CurlDebugFunction <fun>"
-    CurlDebugData p -> "CurlDebugData " ++ show p
-    CurlCookieSession p -> "CurlCookieSession " ++ show p
-    CurlCAPath p -> "CurlCAPath " ++ show p
-    CurlBufferSize p -> "CurlBufferSize " ++ show p
-    CurlNoSignal p -> "CurlNoSignal " ++ show p
-    CurlShare p -> "CurlShare " ++ show p
-    CurlProxyType p -> "CurlProxyType " ++ show p
-    CurlEncoding p -> "CurlEncoding " ++ show p
-    CurlPrivate p -> "CurlPrivate " ++ show p
-    CurlHttp200Aliases p -> "CurlHttp200Aliases " ++ show p
-    CurlUnrestrictedAuth p -> "CurlUnrestrictedAuth " ++ show p
-    CurlFtppUseEPRT p -> "CurlFtppUseEPRT " ++ show p
-    CurlHttpAuth p -> "CurlHttpAuth " ++ show p
-    CurlSSLCtxFunction {} -> "CurlSSLCtxFunction <fun>"
-    CurlSSLCtxData p -> "CurlSSLCtxData " ++ show p
-    CurlFtpCreateMissingDirs p -> "CurlFtpCreateMissingDirs " ++ show p
-    CurlProxyAuth p -> "CurlProxyAuth " ++ show p
-    CurlFtpResponseTimeout p -> "CurlFtpResponseTimeout " ++ show p
-    CurlIPResolve p -> "CurlIPResolve " ++ show p
-    CurlMaxFileSize p -> "CurlMaxFileSize " ++ show p
-    CurlInFileSizeLarge p -> "CurlInFileSizeLarge " ++ show p
-    CurlResumeFromLarge p -> "CurlResumeFromLarge " ++ show p
-    CurlMaxFileSizeLarge p -> "CurlMaxFileSizeLarge " ++ show p
-    CurlNetrcFile p -> "CurlNetrcFile " ++ show p
-    CurlFtpSSL p -> "CurlFtpSSL " ++ show p
-    CurlPostFieldSizeLarge p -> "CurlPostFieldSizeLarge " ++ show p
-    CurlTCPNoDelay p -> "CurlTCPNoDelay " ++ show p
-    CurlFtpSSLAuth p -> "CurlFtpSSLAuth " ++ show p
-    CurlIOCTLFunction p -> "CurlIOCTLFunction " ++ show p
-    CurlIOCTLData p -> "CurlIOCTLData " ++ show p
-    CurlFtpAccount p -> "CurlFtpAccount " ++ show p
-    CurlCookieList p -> "CurlCookieList " ++ show p
-    CurlIgnoreContentLength p -> "CurlIgnoreContentLength " ++ show p
-    CurlFtpSkipPASVIP p -> "CurlFtpSkipPASVIP " ++ show p
-    CurlFtpFileMethod p -> "CurlFtpFileMethod " ++ show p
-    CurlLocalPort p -> "CurlLocalPort " ++ show p
-    CurlLocalPortRange p -> "CurlLocalPortRange " ++ show p
-    CurlConnectOnly p -> "CurlConnectOnly " ++ show p
-    CurlConvFromNetworkFunction p -> "CurlConvFromNetworkFunction " ++ show p
-    CurlConvToNetworkFunction p -> "CurlConvToNetworkFunction " ++ show p
-    CurlConvFromUtf8Function p -> "CurlConvFromUtf8Function " ++ show p
-    CurlMaxSendSpeedLarge p -> "CurlMaxSendSpeedLarge " ++ show p
-    CurlMaxRecvSpeedLarge p -> "CurlMaxRecvSpeedLarge " ++ show p
-    CurlFtpAlternativeToUser p -> "CurlFtpAlternativeToUser " ++ show p
-    CurlSockOptFunction p -> "CurlSockOptFunction " ++ show p
-    CurlSockOptData p -> "CurlSockOptData " ++ show p
-    CurlSSLSessionIdCache p -> "CurlSSLSessionIdCache " ++ show p
-    CurlSSHAuthTypes p -> "CurlSSHAuthTypes " ++ show p
-    CurlSSHPublicKeyFile p -> "CurlSSHPublicKeyFile " ++ show p
-    CurlSSHPrivateKeyFile p -> "CurlSSHPrivateKeyFile " ++ show p
-    CurlFtpSSLCCC p -> "CurlFtpSSLCCC " ++ show p
-    CurlTimeoutMS p -> "CurlTimeoutMS " ++ show p
-    CurlConnectTimeoutMS p -> "CurlConnectTimeoutMS " ++ show p
-    CurlHttpTransferDecoding p -> "CurlHttpTransferDecoding " ++ show p
-    CurlHttpContentDecoding p -> "CurlHttpContentDecoding " ++ show p
-    CurlNewFilePerms l -> "CurlNewFilePerms " ++ show l
-    CurlNewDirectoryPerms p -> "CurlNewDirectoryPerms " ++ show p
-    CurlPostRedirect p -> "CurlPostRedirect " ++ show p
-    CurlSSHHostPublicKeyMD5 p -> "CurlSSHHostPublicKeyMD5 " ++ show p
-    CurlCopyPostFields p -> "CurlCopyPostFields " ++ show p
-    CurlProxyTransferMode p -> "CurlProxyTransferMode " ++ show p
-    CurlCRLFile p -> "CurlCRLFile " ++ show p
-    CurlIssuerCert p -> "CurlIssuerCert " ++ show p
-    CurlAddressScope p -> "CurlAddressScope " ++ show p
-    CurlCertInfo p -> "CurlCertInfo " ++ show p
-    CurlUserName p -> "CurlUserName " ++ show p
-    CurlUserPassword p -> "CurlUserPassword " ++ show p
-    CurlProxyUser p -> "CurlProxyUser " ++ show p
-    CurlProxyPassword p -> "CurlProxyPassword " ++ show p
+unmarshalCptr :: Unmarshaller a -> Int -> Ptr CChar -> IO a
+unmarshalCptr Unmarshaller {pointer} x = pointer x . castPtr

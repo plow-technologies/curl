@@ -69,20 +69,20 @@ setopt hh o = curlPrim hh $ \r h -> unmarshallOption (easy_um r h) o
     easy_um :: IORef OptionMap -> CurlH -> Unmarshaller CurlCode
     easy_um r h =
       Unmarshaller
-        { u_long -- :: Int -> Long     -> IO CurlCode
+        { long -- :: Int -> Long     -> IO CurlCode
           =
             \i x -> liftM toCode $ easy_setopt_long h i x,
-          u_llong --  :: Int -> LLong    -> IO CurlCode
+          llong --  :: Int -> LLong    -> IO CurlCode
           =
             \i x -> liftM toCode $ easy_setopt_llong h i x,
-          u_string -- :: Int -> String   -> IO CurlCode
+          string -- :: Int -> String   -> IO CurlCode
           =
             \i x -> do
               debug $ "ALLOC: " ++ x
               c_x <- newCString x
               updateCleanup r i $ debug ("FREE: " ++ x) >> free c_x
               liftM toCode $ easy_setopt_string h i c_x,
-          u_strings -- :: Int -> [String] -> IO CurlCode
+          strings -- :: Int -> [String] -> IO CurlCode
           =
             \i x ->
               do
@@ -93,34 +93,34 @@ setopt hh o = curlPrim hh $ \r h -> unmarshallOption (easy_um r h) o
                 updateCleanup r i $
                   debug ("FREE: " ++ show x) >> curl_slist_free ip
                 liftM toCode $ easy_setopt_string h i (castPtr ip),
-          u_ptr -- :: Int -> Ptr ()   -> IO a
+          pointer -- :: Int -> Ptr ()   -> IO a
           =
             \i x -> liftM toCode $ easy_setopt_ptr h i x,
-          u_writeFun -- :: Int -> WriteFunction -> IO a
+          writeFun -- :: Int -> WriteFunction -> IO a
           =
             \i x -> do
               debug "ALLOC: WRITER"
               fp <- mkWriter x
               updateCleanup r i $ debug "FREE: WRITER" >> freeHaskellFunPtr fp
               liftM toCode $ easy_setopt_wfun h i fp,
-          u_readFun -- :: Int -> ReadFunction -> IO a
+          readFun -- :: Int -> ReadFunction -> IO a
           =
             \i x -> do
               let wrapResult f a b c d = do
                     mb <- f a b c d
-                    return (fromMaybe curl_readfunc_abort mb)
+                    return (fromMaybe curlReadfuncAbort mb)
               debug "ALLOC: READER"
               fp <- mkReader (wrapResult x)
               updateCleanup r i $ debug "FREE: READER" >> freeHaskellFunPtr fp
               liftM toCode $ easy_setopt_rfun h i fp,
-          u_progressFun -- :: Int -> ProgressFunction -> IO a
+          progressFun -- :: Int -> ProgressFunction -> IO a
           =
             \i x -> do
               debug "ALLOC: PROGRESS"
               fp <- mkProgress x
               updateCleanup r i $ debug "FREE: PROGRESS" >> freeHaskellFunPtr fp
               liftM toCode $ easy_setopt_fptr h i fp,
-          u_debugFun -- :: Int -> DebugFunction -> IO a
+          debugFun -- :: Int -> DebugFunction -> IO a
           =
             \i debFun -> do
               let wrapFun fun _a b c d e =
@@ -129,33 +129,33 @@ setopt hh o = curlPrim hh $ \r h -> unmarshallOption (easy_um r h) o
               fp <- mkDebugFun (wrapFun debFun)
               updateCleanup r i $ debug "FREE: DEBUG" >> freeHaskellFunPtr fp
               liftM toCode $ easy_setopt_fptr h i fp,
-          u_posts -- :: Int -> [HttpPost] -> IO a
+          posts -- :: Int -> [HttpPost] -> IO a
           =
             \i x -> do
               debug "ALLOC: POSTS"
               p <- marshallPosts x
               updateCleanup r i $ debug "FREE: POSTS" >> curl_formfree p
               liftM toCode $ easy_setopt_ptr h i p,
-          u_sslctxt -- :: Int -> SSLCtxtFunction -> IO a
+          sslctxt -- :: Int -> SSLCtxtFunction -> IO a
           =
             \i x -> do
               debug "ALLOC: SSL_FUN"
               p <- mkSslCtxtFun x
               updateCleanup r i $ debug "FREE: SSL_FUN" >> freeHaskellFunPtr p
               liftM toCode $ easy_setopt_fptr h i p,
-          u_ioctl_fun -- :: Int -> Ptr () -> IO a
+          ioctlFun -- :: Int -> Ptr () -> IO a
           =
             \i x -> liftM toCode $ easy_setopt_ptr h i x,
-          u_convFromNetwork -- :: Int -> Ptr () -> IO a
+          convFromNetwork -- :: Int -> Ptr () -> IO a
           =
             \i x -> liftM toCode $ easy_setopt_ptr h i x,
-          u_convToNetwork -- :: Int -> Ptr () -> IO a
+          convToNetwork -- :: Int -> Ptr () -> IO a
           =
             \i x -> liftM toCode $ easy_setopt_ptr h i x,
-          u_convFromUtf8 -- :: Int -> Ptr () -> IO a
+          convFromUtf8 -- :: Int -> Ptr () -> IO a
           =
             \i x -> liftM toCode $ easy_setopt_ptr h i x,
-          u_sockoptFun -- :: Int -> Ptr () -> IO a
+          sockoptFun -- :: Int -> Ptr () -> IO a
           =
             \i x -> liftM toCode $ easy_setopt_ptr h i x
         }

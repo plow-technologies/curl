@@ -21,23 +21,29 @@ extra-source-files: CHANGELOG.md
 
 library
   exposed-modules:
-    Network.Curl
-    Network.Curl.Code
-    Network.Curl.Debug
-    Network.Curl.Easy
-    Network.Curl.Info
     Network.Curl.Opts
     Network.Curl.Post
     Network.Curl.Types
 
+  -- Network.Curl
+  -- Network.Curl.Code
+  -- Network.Curl.Debug
+  -- Network.Curl.Easy
+  -- Network.Curl.Info
   hs-source-dirs:     src
   include-dirs:       cbits
   c-sources:          cbits/curlc.c
   extra-libraries:    curl
   default-extensions:
     CPP
+    DeriveGeneric
+    DerivingStrategies
     ForeignFunctionInterface
+    LambdaCase
+    NamedFieldPuns
     OverloadedStrings
+    RecordWildCards
+    ScopedTypeVariables
 
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates

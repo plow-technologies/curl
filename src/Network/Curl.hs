@@ -144,7 +144,7 @@ method_HEAD = [CurlPost False, CurlNoBody True]
 
 -- | 'curlGet' perform a basic GET, dumping the output on stdout.
 -- The list of options are set prior performing the GET request.
-curlGet :: URLString -> [CurlOption] -> IO ()
+curlGet :: UrlString -> [CurlOption] -> IO ()
 curlGet url opts =
   initialize >>= \h -> do
     setopt h (CurlFailOnError True)
@@ -155,7 +155,7 @@ curlGet url opts =
     perform h
     return ()
 
-setDefaultSSLOpts :: Curl -> URLString -> IO ()
+setDefaultSSLOpts :: Curl -> UrlString -> IO ()
 setDefaultSSLOpts h url
   | "https:" `isPrefixOf` url = do
       -- the default options are pretty dire, really -- turning off
@@ -170,7 +170,7 @@ setDefaultSSLOpts h url
 -- | 'curlGetString' performs the same request as 'curlGet', but
 -- returns the response body as a Haskell string.
 curlGetString ::
-  URLString ->
+  UrlString ->
   [CurlOption] ->
   IO (CurlCode, String)
 curlGetString url opts =
@@ -188,7 +188,7 @@ curlGetString url opts =
 
 curlGetString_ ::
   (CurlBuffer ty) =>
-  URLString ->
+  UrlString ->
   [CurlOption] ->
   IO (CurlCode, ty)
 curlGetString_ url opts =
@@ -222,7 +222,7 @@ data CurlResponse_ headerTy bodyTy = CurlResponse
 -- The representation of the body is overloaded
 curlGetResponse_ ::
   (CurlHeader hdr, CurlBuffer ty) =>
-  URLString ->
+  UrlString ->
   [CurlOption] ->
   IO (CurlResponse_ hdr ty)
 curlGetResponse_ url opts = do
@@ -238,7 +238,7 @@ curlGetResponse_ url opts = do
 
 {-# DEPRECATED curlGetResponse "Switch to using curlGetResponse_" #-}
 curlGetResponse ::
-  URLString ->
+  UrlString ->
   [CurlOption] ->
   IO CurlResponse
 curlGetResponse url opts = curlGetResponse_ url opts
@@ -293,14 +293,14 @@ perform_with_response_ h = do
 -- | Performs a curl request using an exisitng curl handle.
 -- The provided URL will overwride any 'CurlURL' options that
 -- are provided in the list of options.  See also: 'perform_with_response'.
-do_curl :: Curl -> URLString -> [CurlOption] -> IO CurlResponse
+do_curl :: Curl -> UrlString -> [CurlOption] -> IO CurlResponse
 do_curl h url opts = do_curl_ h url opts
 {-# DEPRECATED do_curl "Consider switching to do_curl_" #-}
 
 do_curl_ ::
   (CurlHeader headerTy, CurlBuffer bodyTy) =>
   Curl ->
-  URLString ->
+  UrlString ->
   [CurlOption] ->
   IO (CurlResponse_ headerTy bodyTy)
 do_curl_ h url opts = do
@@ -311,7 +311,7 @@ do_curl_ h url opts = do
 
 -- | Get the headers associated with a particular URL.
 -- Returns the status line and the key-value pairs for the headers.
-curlHead :: URLString -> [CurlOption] -> IO (String, [(String, String)])
+curlHead :: UrlString -> [CurlOption] -> IO (String, [(String, String)])
 curlHead url opts =
   initialize >>= \h ->
     do
@@ -329,7 +329,7 @@ curlHead url opts =
 -- Returns the status line and the key-value pairs for the headers.
 curlHead_ ::
   (CurlHeader headers) =>
-  URLString ->
+  UrlString ->
   [CurlOption] ->
   IO (String, headers)
 curlHead_ url opts =
@@ -369,7 +369,7 @@ parseHeader xs =
     (as, _) -> (as, "")
 
 -- | 'curlMultiPost' perform a multi-part POST submission.
-curlMultiPost :: URLString -> [CurlOption] -> [HttpPost] -> IO ()
+curlMultiPost :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
 curlMultiPost s os ps =
   initialize >>= \h -> do
     setopt h (CurlVerbose True)
@@ -381,7 +381,7 @@ curlMultiPost s os ps =
 
 -- | 'curlPost' performs. a common POST operation, namely that
 -- of submitting a sequence of name=value pairs.
-curlPost :: URLString -> [String] -> IO ()
+curlPost :: UrlString -> [String] -> IO ()
 curlPost s ps =
   initialize >>= \h -> do
     setopt h (CurlVerbose True)

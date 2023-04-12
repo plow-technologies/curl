@@ -21,7 +21,7 @@
 -- upon shutting down the curl session.
 module Network.Curl.Types
   ( CurlH,
-    URLString,
+    UrlString,
     Port,
     Long,
     LLong,
@@ -53,7 +53,7 @@ data Curl_
 
 type CurlH = Ptr Curl_
 
-type URLString = String
+type UrlString = String
 
 type Port = Long
 

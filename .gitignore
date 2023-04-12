@@ -1,9 +1,2 @@
-*~
-dist
-Network/Curl/*_stub.*
-config.log
-config.status
-curl.buildinfo
-*.o
-*.hi
-
+dist-newstyle
+result

@@ -1,52 +1,54 @@
+cabal-version:      2.4
 name:               curl
-version:            1.3.8
+version:            2.0
 synopsis:           Haskell binding to libcurl
 description:
-    libcurl is a client-side URL transfer library, supporting FTP, FTPS, HTTP,
-    HTTPS, SCP, SFTP, TFTP, TELNET, DICT, LDAP, LDAPS and FILE.
-    libcurl supports SSL certificates, HTTP POST, HTTP PUT, FTP uploading,
-    HTTP form based upload, proxies, cookies, user+password authentication
-    (Basic, Digest, NTLM, Negotiate, Kerberos4), file transfer resume,
-    http proxy tunneling and more!
-    .
-    This package provides a Haskell binding to libcurl.
+  libcurl is a client-side URL transfer library, supporting FTP, FTPS, HTTP,
+  HTTPS, SCP, SFTP, TFTP, TELNET, DICT, LDAP, LDAPS and FILE.
+  libcurl supports SSL certificates, HTTP POST, HTTP PUT, FTP uploading,
+  HTTP form based upload, proxies, cookies, user+password authentication
+  (Basic, Digest, NTLM, Negotiate, Kerberos4), file transfer resume,
+  http proxy tunneling and more!
+  .
+  This package provides Haskell bindings to libcurl and is a fork of the
+  original curl library from Galois Inc
+
 category:           Network
-license:            BSD3
+license:            BSD-3-Clause
 license-file:       LICENSE
 author:             Sigbjorn Finne
-maintainer:         Don Stewart <dons00@gmail.com>
-build-type:         Configure
-cabal-version:      >= 1.6
-extra-source-files: configure, configure.ac, curl.buildinfo.in, CHANGES
-
-flag new-base
-  Description: Build with new smaller base library
-  Default: True
+extra-source-files: CHANGELOG.md
 
 library
-  Exposed-modules: Network.Curl
-                   Network.Curl.Code
-                   Network.Curl.Info
-                   Network.Curl.Opts
-                   Network.Curl.Post
-                   Network.Curl.Types
-                   Network.Curl.Easy
-                   Network.Curl.Debug
+  exposed-modules:
+    Network.Curl
+    Network.Curl.Code
+    Network.Curl.Debug
+    Network.Curl.Easy
+    Network.Curl.Info
+    Network.Curl.Opts
+    Network.Curl.Post
+    Network.Curl.Types
 
-  c-sources:        curlc.c
-  Extra-libraries:  curl
-  Extensions:       CPP, ForeignFunctionInterface
-  Ghc-options:      -Wall
+  hs-source-dirs:     src
+  include-dirs:       cbits
+  c-sources:          cbits/curlc.c
+  extra-libraries:    curl
+  default-extensions:
+    CPP
+    ForeignFunctionInterface
+    OverloadedStrings
 
-  Build-Depends: base
-  if flag(new-base)
-    Build-depends: base >= 3 && < 5, containers
-  else
-    Build-depends: base < 3
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+    -Wmissing-deriving-strategies
 
-  build-depends: bytestring >= 0.9
+  build-depends:
+    , base        <5
+    , bytestring  >=0.9
+    , containers
 
 source-repository head
   type:     git
   location: git://github.com/galoisinc/curl.git
-

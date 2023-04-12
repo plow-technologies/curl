@@ -77,8 +77,8 @@ mkCurl h = mkCurlWithCleanup h emptyOptionMap
 
 -- | Allocates a Haskell handle from a C handle.
 mkCurlWithCleanup :: CurlHandle -> OptionMap -> IO Curl
-mkCurlWithCleanup h clean = do
-  cleanup <- newIORef clean
+mkCurlWithCleanup h m = do
+  cleanup <- newIORef m
   fptr <- newForeignPtr_ h
   handle <- newMVar fptr
   Foreign.Concurrent.addForeignPtrFinalizer fptr $

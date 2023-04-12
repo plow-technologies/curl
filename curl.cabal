@@ -24,6 +24,7 @@ library
     Network.Curl.Opts
     Network.Curl.Post
     Network.Curl.Types
+
   -- Network.Curl
   -- Network.Curl.Code
   -- Network.Curl.Easy
@@ -42,6 +43,7 @@ library
     OverloadedStrings
     RecordWildCards
     ScopedTypeVariables
+    TypeApplications
 
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates

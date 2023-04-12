@@ -87,11 +87,11 @@ setopt hh o = curlPrim hh $ \r h -> unmarshallOption (easy_um r h) o
             \i x ->
               do
                 debug ("ALLOC: " ++ show x)
-                -- curl_slist_append will copy its string argument
-                let addOne ip s = withCString s $ curl_slist_append ip
+                -- slistAppend will copy its string argument
+                let addOne ip s = withCString s $ slistAppend ip
                 ip <- foldM addOne nullPtr x
                 updateCleanup r i $
-                  debug ("FREE: " ++ show x) >> curl_slist_free ip
+                  debug ("FREE: " ++ show x) >> curlSlistFree ip
                 liftM toCode $ easy_setopt_string h i (castPtr ip),
           pointer -- :: Int -> Ptr ()   -> IO a
           =
@@ -134,7 +134,7 @@ setopt hh o = curlPrim hh $ \r h -> unmarshallOption (easy_um r h) o
             \i x -> do
               debug "ALLOC: POSTS"
               p <- marshallPosts x
-              updateCleanup r i $ debug "FREE: POSTS" >> curl_formfree p
+              updateCleanup r i $ debug "FREE: POSTS" >> curlFormfree p
               liftM toCode $ easy_setopt_ptr h i p,
           sslctxt -- :: Int -> SSLCtxtFunction -> IO a
           =

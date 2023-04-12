@@ -40,7 +40,7 @@ data HttpPost = HttpPost
 
 data Content
   = ContentFile FilePath
-  | ContentBuffer (Ptr CChar) Long -- byte arrays also?
+  | ContentBuffer (Ptr CChar) Word32 -- byte arrays also?
   | ContentString String
   deriving (Eq, Show)
 
@@ -86,19 +86,19 @@ marshallPost p = do
       pokeByteOff php (ptrIndex 4) (length f)
       pokeByteOff php (ptrIndex 5) nullPtr
       pokeByteOff php (ptrIndex 6) nullPtr
-      pokeByteOff php (ptrIndex 10) (0x1 :: Long)
+      pokeByteOff php (ptrIndex 10) (0x1 :: Word32)
     ContentBuffer ptr len -> do
       pokeByteOff php (ptrIndex 3) nullPtr
       pokeByteOff php (ptrIndex 4) nullPtr
       pokeByteOff php (ptrIndex 5) ptr
       pokeByteOff php (ptrIndex 6) len
-      pokeByteOff php (ptrIndex 10) (0x10 :: Long)
+      pokeByteOff php (ptrIndex 10) (0x10 :: Word32)
     ContentString s -> do
       newCString s >>= pokeByteOff php (ptrIndex 3)
       pokeByteOff php (ptrIndex 4) (length s)
       pokeByteOff php (ptrIndex 5) nullPtr
       pokeByteOff php (ptrIndex 6) nullPtr
-      pokeByteOff php (ptrIndex 10) (0x4 :: Long)
+      pokeByteOff php (ptrIndex 10) (0x4 :: Word32)
 
   cs1 <- case contentType p of
     Nothing -> return nullPtr
@@ -116,10 +116,10 @@ marshallPost p = do
     ptrIndex n = n * sizeOf nullPtr
 
 foreign import ccall "curl_slist_append"
-  curl_slist_append :: Ptr Slist_ -> CString -> IO (Ptr Slist_)
+  curl_slist_append :: Ptr Slist -> CString -> IO (Ptr Slist)
 
 foreign import ccall "curl_slist_free_all"
-  curl_slist_free :: Ptr Slist_ -> IO ()
+  curl_slist_free :: Ptr Slist -> IO ()
 
 foreign import ccall "curl_formfree"
   curl_formfree :: Ptr a -> IO ()

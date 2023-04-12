@@ -66,13 +66,13 @@ setopt ::
   IO CurlCode
 setopt hh o = curlPrim hh $ \r h -> unmarshallOption (easy_um r h) o
   where
-    easy_um :: IORef OptionMap -> CurlH -> Unmarshaller CurlCode
+    easy_um :: IORef OptionMap -> CurlHandle -> Unmarshaller CurlCode
     easy_um r h =
       Unmarshaller
-        { long -- :: Int -> Long     -> IO CurlCode
+        { long -- :: Int -> Word32     -> IO CurlCode
           =
             \i x -> liftM toCode $ easy_setopt_long h i x,
-          llong --  :: Int -> LLong    -> IO CurlCode
+          llong --  :: Int -> Word64    -> IO CurlCode
           =
             \i x -> liftM toCode $ easy_setopt_llong h i x,
           string -- :: Int -> String   -> IO CurlCode
@@ -191,37 +191,37 @@ foreign import ccall "curl/easy.h curl_global_cleanup"
   curl_global_cleanup :: IO ()
 
 foreign import ccall "curl/easy.h curl_easy_init"
-  easy_initialize :: IO CurlH
+  easy_initialize :: IO CurlHandle
 
 foreign import ccall "curl/easy.h curl_easy_perform"
-  easy_perform_prim :: CurlH -> IO CInt
+  easy_perform_prim :: CurlHandle -> IO CInt
 
 foreign import ccall "curl_easy_duphandle"
-  easy_duphandle :: CurlH -> IO CurlH
+  easy_duphandle :: CurlHandle -> IO CurlHandle
 
 foreign import ccall "curl_easy_reset"
-  easy_reset :: CurlH -> IO ()
+  easy_reset :: CurlHandle -> IO ()
 
 foreign import ccall "curl_easy_setopt_long"
-  easy_setopt_long :: CurlH -> Int -> Long -> IO CInt
+  easy_setopt_long :: CurlHandle -> Int -> Word32 -> IO CInt
 
 foreign import ccall "curl_easy_setopt_longlong"
-  easy_setopt_llong :: CurlH -> Int -> LLong -> IO CInt
+  easy_setopt_llong :: CurlHandle -> Int -> Word64 -> IO CInt
 
 foreign import ccall "curl_easy_setopt_string"
-  easy_setopt_string :: CurlH -> Int -> Ptr CChar -> IO CInt
+  easy_setopt_string :: CurlHandle -> Int -> Ptr CChar -> IO CInt
 
 foreign import ccall "curl_easy_setopt_ptr"
-  easy_setopt_ptr :: CurlH -> Int -> Ptr a -> IO CInt
+  easy_setopt_ptr :: CurlHandle -> Int -> Ptr a -> IO CInt
 
 foreign import ccall "curl_easy_setopt_ptr"
-  easy_setopt_fptr :: CurlH -> Int -> FunPtr a -> IO CInt
+  easy_setopt_fptr :: CurlHandle -> Int -> FunPtr a -> IO CInt
 
 foreign import ccall "curl_easy_setopt_ptr"
-  easy_setopt_wfun :: CurlH -> Int -> FunPtr WriteFunction -> IO CInt
+  easy_setopt_wfun :: CurlHandle -> Int -> FunPtr WriteFunction -> IO CInt
 
 foreign import ccall "curl_easy_setopt_ptr"
-  easy_setopt_rfun :: CurlH -> Int -> FunPtr ReadFunctionPrim -> IO CInt
+  easy_setopt_rfun :: CurlHandle -> Int -> FunPtr ReadFunctionPrim -> IO CInt
 
 foreign import ccall "wrapper"
   mkWriter :: WriteFunction -> IO (FunPtr WriteFunction)

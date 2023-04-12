@@ -64,7 +64,7 @@ data Info
 
 data InfoValue
   = IString String
-  | ILong Long
+  | ILong Word32
   | IDouble Double
   | IList [String]
 
@@ -77,24 +77,24 @@ instance Show InfoValue where
       IList ss -> show ss
 
 {-
-stringTag :: Long
+stringTag :: Word32
 stringTag = 0x100000  -- CURLINFO_STRING
 
-longTag :: Long
+longTag :: Word32
 longTag = 0x200000  -- CURLINFO_LONG
 
-doubleTag :: Long
+doubleTag :: Word32
 doubleTag = 0x300000  -- CURLINFO_DOUBLE
 
-slistTag :: Long
+slistTag :: Word32
 slistTag = 0x400000  -- CURLINFO_SLIST
 -}
 
 {- unused, unexported
-infoMask :: Long
+infoMask :: Word32
 infoMask = 0x0fffff  -- CURLINFO_MASK
 
-infoTypeMask :: Long
+infoTypeMask :: Word32
 infoTypeMask = 0xf00000  -- CURLINFO_TYPEMASK
 -}
 
@@ -132,7 +132,7 @@ getInfo h i = do
     LastSocket -> getInfoLong h (show i) 29
     FtpEntryPath -> getInfoStr h (show i) 30
 
-getInfoStr :: Curl -> String -> Long -> IO InfoValue
+getInfoStr :: Curl -> String -> Word32 -> IO InfoValue
 getInfoStr h loc tg =
   alloca $ \ps -> do
     rc <- curlPrim h $ \_ p -> easy_getinfo_str p tg ps
@@ -144,7 +144,7 @@ getInfoStr h loc tg =
           else liftM IString $ peekCString s
       _ -> fail ("getInfo{" ++ loc ++ "}: " ++ show (toCode rc))
 
-getInfoLong :: Curl -> String -> Long -> IO InfoValue
+getInfoLong :: Curl -> String -> Word32 -> IO InfoValue
 getInfoLong h loc tg =
   alloca $ \pl -> do
     rc <- curlPrim h $ \_ p -> easy_getinfo_long p tg pl
@@ -154,7 +154,7 @@ getInfoLong h loc tg =
         return (ILong l)
       _ -> fail ("getInfo{" ++ loc ++ "}: " ++ show (toCode rc))
 
-getInfoDouble :: Curl -> String -> Long -> IO InfoValue
+getInfoDouble :: Curl -> String -> Word32 -> IO InfoValue
 getInfoDouble h loc tg =
   alloca $ \pd -> do
     rc <- curlPrim h $ \_ p -> easy_getinfo_double p tg pd
@@ -164,7 +164,7 @@ getInfoDouble h loc tg =
         return (IDouble d)
       _ -> fail ("getInfo{" ++ loc ++ "}: " ++ show (toCode rc))
 
-getInfoSList :: Curl -> String -> Long -> IO InfoValue
+getInfoSList :: Curl -> String -> Word32 -> IO InfoValue
 getInfoSList h loc tg =
   alloca $ \ps -> do
     rc <- curlPrim h $ \_ p -> easy_getinfo_slist p tg ps
@@ -186,13 +186,13 @@ getInfoSList h loc tg =
 
 -- FFI decls
 foreign import ccall "curl_easy_getinfo_long"
-  easy_getinfo_long :: CurlH -> Long -> Ptr Long -> IO CInt
+  easy_getinfo_long :: CurlHandle -> Word32 -> Ptr Word32 -> IO CInt
 
 foreign import ccall "curl_easy_getinfo_string"
-  easy_getinfo_str :: CurlH -> Long -> Ptr CString -> IO CInt
+  easy_getinfo_str :: CurlHandle -> Word32 -> Ptr CString -> IO CInt
 
 foreign import ccall "curl_easy_getinfo_double"
-  easy_getinfo_double :: CurlH -> Long -> Ptr Double -> IO CInt
+  easy_getinfo_double :: CurlHandle -> Word32 -> Ptr Double -> IO CInt
 
 foreign import ccall "curl_easy_getinfo_slist"
-  easy_getinfo_slist :: CurlH -> Long -> Ptr (Ptr (Ptr CChar)) -> IO CInt
+  easy_getinfo_slist :: CurlHandle -> Word32 -> Ptr (Ptr (Ptr CChar)) -> IO CInt

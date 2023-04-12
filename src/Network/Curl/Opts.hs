@@ -22,7 +22,7 @@ import Foreign.C.Types (CChar, CInt)
 import Foreign.Ptr (Ptr, castPtr)
 import GHC.Generics (Generic)
 import Network.Curl.Post (HttpPost)
-import Network.Curl.Types (Curl, CurlH, Port, UrlString)
+import Network.Curl.Types (Curl, CurlHandle, Port, UrlString)
 
 data CurlOption
   = -- | external pointer to pass to as 'WriteFunction's last argument.
@@ -434,7 +434,7 @@ newtype DebugFunction
   deriving (Show) via (ShowFun DebugFunction)
 
 type DebugFunctionPrim =
-  CurlH -> --  connection handle
+  CurlHandle -> --  connection handle
   CInt -> --  type of call
   Ptr CChar -> --  data buffer
   CInt -> --  length of buffer
@@ -443,7 +443,7 @@ type DebugFunctionPrim =
 
 newtype SslCtxtFunction
   = SslCtxtFunction
-      ( CurlH -> --  connection handle
+      ( CurlHandle -> --  connection handle
         Ptr () -> --  the Ssl_CTX handle
         Ptr () -> --  state argument
         IO CInt

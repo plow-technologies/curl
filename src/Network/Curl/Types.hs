@@ -1,6 +1,9 @@
+{-# LANGUAGE CApiFFI #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 --------------------------------------------------------------------
 
@@ -20,12 +23,10 @@
 -- handle along with a set of cleanup actions tht should be performed
 -- upon shutting down the curl session.
 module Network.Curl.Types
-  ( CurlH,
+  ( CurlHandle,
     UrlString,
     Port,
-    Long,
-    LLong,
-    Slist_,
+    Slist,
     Curl,
     curlPrim,
     mkCurl,
@@ -39,60 +40,50 @@ where
 
 import Control.Concurrent
 import Data.IORef
-import qualified Data.IntMap as M
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
 import Data.Word
 import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr
 import Foreign.Ptr
-import Network.Curl.Debug
+import GHC.Generics (Generic)
 
--- import System.IO
+data Curl = Curl
+  { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.
+    cleanup :: IORef OptionMap -- deallocate Haskell curl data
+  }
+  deriving stock (Generic)
 
-data Curl_
+data CurlPrim
 
-type CurlH = Ptr Curl_
+type CurlHandle = Ptr CurlPrim
 
 type UrlString = String
 
-type Port = Long
+type Port = Word32
 
-type Long = Word32
-
-type LLong = Word64
-
-data Slist_
-
-data Curl = Curl
-  { curlH :: MVar (ForeignPtr Curl_), -- libcurl is not thread-safe.
-    curlCleanup :: IORef OptionMap -- deallocate Haskell curl data
-  }
+data Slist
 
 -- | Execute a "primitive" curl operation.
 -- NOTE: See warnings about the use of 'withForeignPtr'.
-curlPrim :: Curl -> (IORef OptionMap -> CurlH -> IO a) -> IO a
-curlPrim c f = withMVar (curlH c) $ \h ->
-  withForeignPtr h $ f $ curlCleanup c
+curlPrim :: Curl -> (IORef OptionMap -> CurlHandle -> IO a) -> IO a
+curlPrim Curl {handle, cleanup} f =
+  withMVar handle $ \h -> withForeignPtr h . f $ cleanup
 
 -- | Allocates a Haskell handle from a C handle.
-mkCurl :: CurlH -> IO Curl
-mkCurl h = mkCurlWithCleanup h om_empty
+mkCurl :: CurlHandle -> IO Curl
+mkCurl h = mkCurlWithCleanup h emptyOptionMap
 
 -- | Allocates a Haskell handle from a C handle.
-mkCurlWithCleanup :: CurlH -> OptionMap -> IO Curl
+mkCurlWithCleanup :: CurlHandle -> OptionMap -> IO Curl
 mkCurlWithCleanup h clean = do
-  debug "ALLOC: CURL"
-  v2 <- newIORef clean
-  fh <- newForeignPtr_ h
-  v1 <- newMVar fh
-  let new_h = Curl {curlH = v1, curlCleanup = v2}
-
-  let fnalizr = do
-        debug "FREE: CURL"
-        easy_cleanup h
-        runCleanup v2
-  Foreign.Concurrent.addForeignPtrFinalizer fh fnalizr
-  return new_h
+  cleanup <- newIORef clean
+  fptr <- newForeignPtr_ h
+  handle <- newMVar fptr
+  Foreign.Concurrent.addForeignPtrFinalizer fptr $
+    easyCleanup h *> runCleanup cleanup
+  pure Curl {handle, cleanup}
 
 -- Admin code for cleaning up marshalled data.
 -- Note that these functions assume that they are running atomically,
@@ -100,63 +91,64 @@ mkCurlWithCleanup h clean = do
 --------------------------------------------------------------------------------
 runCleanup :: IORef OptionMap -> IO ()
 runCleanup r = do
-  m <- readIORef r
-  om_cleanup m
-  writeIORef r om_empty
+  cleanupOptionMap =<< readIORef r
+  writeIORef r emptyOptionMap
 
 shareCleanup :: IORef OptionMap -> IO OptionMap
 shareCleanup r = do
   old <- readIORef r
-  new <- om_dup old
+  new <- dupOptionMap old
   writeIORef r new
-  return new
+  pure new
 
 updateCleanup :: IORef OptionMap -> Int -> IO () -> IO ()
-updateCleanup r option act = writeIORef r =<< om_set option act =<< readIORef r
+updateCleanup r option act =
+  writeIORef r
+    =<< setOptionMap option act
+    =<< readIORef r
 
 -- Maps that associate curl options with IO actions to
 -- perform cleanup for them.
 --------------------------------------------------------------------------------
-type OptionMap = M.IntMap (IO ())
+type OptionMap = IntMap (IO ())
 
 -- | An empty option map.
-om_empty :: OptionMap
-om_empty = M.empty
+emptyOptionMap :: OptionMap
+emptyOptionMap = IntMap.empty
 
 -- | Set the IO action for an option,
 -- executing the previvous action, if there was one.
-om_set :: Int -> IO () -> OptionMap -> IO OptionMap
-om_set opt new_act old_map =
-  do
-    fromMaybe (return ()) old_act
-    return new_map
+setOptionMap :: Int -> IO () -> OptionMap -> IO OptionMap
+setOptionMap opt new opts = do
+  fromMaybe (pure ()) old
+  pure m
   where
-    (old_act, new_map) = M.insertLookupWithKey (\_ a _ -> a) opt new_act old_map
+    old :: Maybe (IO ())
+    m :: IntMap (IO ())
+    (old, m) = IntMap.insertLookupWithKey (\_ a _ -> a) opt new opts
 
 -- | Execute all IO actions in the map.
-om_cleanup :: OptionMap -> IO ()
-om_cleanup m = sequence_ (M.elems m)
+cleanupOptionMap :: OptionMap -> IO ()
+cleanupOptionMap = sequence_ . IntMap.elems
 
 -- | Replace the actions in a map, with actions that
 -- will only be executed the second time they are invoked.
-om_dup :: OptionMap -> IO OptionMap
-om_dup old_map = M.fromList `fmap` mapM dup (M.assocs old_map)
+dupOptionMap :: OptionMap -> IO OptionMap
+dupOptionMap = fmap IntMap.fromList . traverse dup . IntMap.assocs
   where
-    dup (x, old_io) = do
-      new_io <- shareIO old_io
-      return (x, new_io)
+    dup :: (a, IO ()) -> IO (a, IO ())
+    dup (x, old) = (x,) <$> shareIO old
 
 -- Share a cleanup action.  When we share cleanup duty between two handles
 -- we need to ensure that the first handle to perform the cleanup will do
 -- nothing (because the other handle still needs the resources).
 shareIO :: IO () -> IO (IO ())
-shareIO act =
-  do
-    v <- newMVar False
-    let new_act = do
-          b <- takeMVar v
-          if b then act else putMVar v True
-    return new_act
+shareIO act = do
+  v <- newMVar False
+  pure $
+    takeMVar v >>= \case
+      True -> act
+      False -> putMVar v True
 
 --------------------------------------------------------------------------------
 
@@ -172,5 +164,4 @@ foreign import ccall "wrapper"
 
 -}
 
-foreign import ccall "curl/curl.h curl_easy_cleanup"
-  easy_cleanup :: CurlH -> IO ()
+foreign import capi "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()

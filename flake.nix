@@ -85,9 +85,10 @@
             programs = {
               nixpkgs-fmt.enable = true;
               cabal-fmt.enable = true;
+              # For the cbits
+              clang-format.enable = true;
               ormolu = {
                 enable = true;
-                package = pkgs.haskellPackages.fourmolu;
                 ghcOpts = [ "TypeApplications" ];
               };
             };

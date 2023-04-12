@@ -1,4 +1,5 @@
 --------------------------------------------------------------------
+
 -- |
 -- Module    : Network.Curl.Debug
 -- Copyright : (c) Galois, Inc. 2008-2009
@@ -9,7 +10,6 @@
 -- Portability:
 --
 -- Debug hooks
-
 module Network.Curl.Debug (debug) where
 
 import System.IO
@@ -19,6 +19,5 @@ debugging = False
 
 debug :: String -> IO ()
 debug msg
-  | debugging     = putStrLn ("DEBUG: " ++ msg) >> hFlush stdout
-  | otherwise     = return ()
-
+  | debugging = putStrLn ("DEBUG: " ++ msg) >> hFlush stdout
+  | otherwise = return ()

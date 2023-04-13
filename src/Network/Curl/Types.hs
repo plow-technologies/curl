@@ -59,6 +59,7 @@ data CurlResponse = CurlResponse
     body :: ByteString,
     info :: Info -> IO InfoValue
   }
+  deriving stock (Generic)
 
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.

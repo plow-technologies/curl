@@ -109,7 +109,7 @@ getInfoSList curl tg =
           s <-
             peekByteOff ptr 0 >>= \case
               ps
-                | ps == nullPtr -> pure ""
+                | ps == nullPtr -> pure mempty
                 | otherwise -> peekCString ps
           fmap (s :) . unmarshallList =<< peekByteOff ptr (sizeOf nullPtr)
 

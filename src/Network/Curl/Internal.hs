@@ -1,4 +1,3 @@
--- |
 module Network.Curl.Internal where
 
 import Control.Monad (void, when, (>=>))
@@ -8,15 +7,73 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as Lazy.ByteString
 import Data.Foldable (foldl', traverse_)
 import Data.Functor ((<&>))
-import Data.IORef
+import Data.IORef (IORef, modifyIORef, newIORef, readIORef)
 import Data.List (isPrefixOf)
-import Foreign.C (CInt)
-import Foreign.C.String
+import Foreign.C (CInt, CStringLen, peekCStringLen)
 import Network.Curl.Easy
 import Network.Curl.Info
 import Network.Curl.Opts
 import Network.Curl.Post
 import Network.Curl.Types
+
+runWithResponse :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
+runWithResponse url opts curl = do
+  setDefaultSslOpts curl url
+  setopts curl opts
+  setopt curl $ Url url
+  performWithResponse curl
+
+-- | 'curlGet' perform a basic GET, dumping the output on stdout.
+-- The list of options are set prior performing the GET request.
+curlGet :: UrlString -> [CurlOption] -> Curl -> IO ()
+curlGet url opts curl = do
+  setopts curl [FailOnError True, Url url]
+  -- Note: later options may (and should, probably) override these defaults.
+  setDefaultSslOpts curl url
+  setopts curl opts
+  void $ perform curl
+
+curlGetString :: UrlString -> [CurlOption] -> Curl -> IO (CurlCode, ByteString)
+curlGetString url opts curl = do
+  (finalBody, gatherBody) <- newIncomingBuffer
+  setDefaultSslOpts curl url
+  setopts
+    curl
+    [ FailOnError True,
+      Url url,
+      WriteFun $ callbackWriter gatherBody
+    ]
+  setopts curl opts
+  (,) <$> perform curl <*> finalBody
+
+-- | Get the headers associated with a particular URL.
+-- Returns the status line and the key-value pairs for the headers.
+curlHead :: UrlString -> [CurlOption] -> Curl -> IO (String, [(String, String)])
+curlHead url opts curl = do
+  (finalHeader, gatherHeader) <- newIncomingHeader
+  setopts
+    curl
+    [ Url url,
+      NoBody True,
+      HeadFun $ callbackWriter gatherHeader
+    ]
+  setopts curl opts
+  void $ perform curl
+  finalHeader
+
+-- | 'curlPost' performs. a common POST operation, namely that
+-- of submitting a sequence of name=value pairs.
+curlPost :: UrlString -> [String] -> Curl -> IO ()
+curlPost s ps curl = do
+  setopts curl [Verbose True, PostFields ps, CookieJar "cookies", Url s]
+  void $ perform curl
+
+-- | 'curlMultiPost' perform a multi-part POST submission.
+curlMultipart :: UrlString -> [CurlOption] -> [HttpPost] -> Curl -> IO ()
+curlMultipart s os ps curl = do
+  setopts curl [Verbose True, Url s, Multipart ps]
+  setopts curl os
+  void $ perform curl
 
 newIncomingHeader :: IO (IO (String, [(String, String)]), CStringLen -> IO ())
 newIncomingHeader = do
@@ -24,7 +81,8 @@ newIncomingHeader = do
     (readFinalHeader ref, peekCStringLen >=> (modifyIORef ref . (:)))
   where
     readFinalHeader :: IORef [String] -> IO (String, [(String, String)])
-    readFinalHeader = fmap (parseStatusNHeaders . concatReverse []) . readIORef
+    readFinalHeader =
+      fmap (parseStatusNHeaders . foldl' (flip (<>)) []) . readIORef
 
 newIncomingBuffer :: IO (IO ByteString, CStringLen -> IO ())
 newIncomingBuffer =
@@ -35,56 +93,14 @@ newIncomingBuffer =
 
 -- | Set a list of options on a Curl handle.
 setopts :: Curl -> [CurlOption] -> IO ()
-setopts curl = traverse_ (setopt curl)
-
--- | 'curlGet' perform a basic GET, dumping the output on stdout.
--- The list of options are set prior performing the GET request.
-curlGet :: UrlString -> [CurlOption] -> IO ()
-curlGet url opts =
-  initialize >>= \curl -> do
-    setopt curl (FailOnError True)
-    setopt curl (Url url)
-    -- Note: later options may (and should, probably) override these defaults.
-    setDefaultSslOpts curl url
-    traverse_ (setopt curl) opts
-    void $ perform curl
+setopts curl = traverse_ $ setopt curl
 
 setDefaultSslOpts :: Curl -> UrlString -> IO ()
 setDefaultSslOpts curl url =
   when ("https:" `isPrefixOf` url) $
     -- the default options are pretty dire, really -- turning off
     -- the peer verification checks!
-    traverse_
-      (setopt curl)
-      [ SslVerifyPeer False,
-        SslVerifyHost 0
-      ]
-
-curlGetString :: UrlString -> [CurlOption] -> IO (CurlCode, ByteString)
-curlGetString url opts =
-  initialize >>= \curl -> do
-    (finalBody, gatherBody) <- newIncomingBuffer
-    setopt curl $ FailOnError True
-    setDefaultSslOpts curl url
-    setopt curl $ Url url
-    setopt curl . WriteFun $ callbackWriter_ gatherBody
-    traverse_ (setopt curl) opts
-    (,) <$> perform curl <*> finalBody
-
--- | @curlGetResponse url opts@ performs a @GET@, returning all the info
--- it can lay its hands on in the response, a value of type 'CurlResponse'.
--- The representation of the body is overloaded
-curlGetResponse :: UrlString -> [CurlOption] -> IO CurlResponse
-curlGetResponse url opts = do
-  curl <- initialize
-  -- Note: later options may (and should, probably) override these defaults.
-  setopt curl $ FailOnError True
-  setDefaultSslOpts curl url
-  setopt curl $ Url url
-  traverse_ (setopt curl) opts
-  -- note that users cannot over-write the body and header handler
-  -- which makes sense because otherwise we will pure a bogus reposnse.
-  performWithResponse curl
+    setopts curl [SslVerifyPeer False, SslVerifyHost 0]
 
 -- | Perform the actions already specified on the handle.
 -- Collects useful information about the returned message.
@@ -97,63 +113,28 @@ performWithResponse curl = do
   -- Instead of allocating a separate handler for each
   -- request we could just set this options one and forall
   -- and just clear the IORefs.
-  setopt curl . WriteFun $ callbackWriter_ gatherBody
-  setopt curl . HeadFun $ callbackWriter_ gatherHeader
-  rc <- perform curl
-  rspCode <- getResponseCode curl
-  (st, hs) <- finalHeader
-  bs <- finalBody
+  setopts
+    curl
+    [ WriteFun $ callbackWriter gatherBody,
+      HeadFun $ callbackWriter gatherHeader
+    ]
+  curlCode <- perform curl
+  status <- getResponseCode curl
+  (statusLine, headers) <- finalHeader
+  body <- finalBody
   pure
     CurlResponse
-      { curlCode = rc,
-        status = rspCode,
-        statusLine = st,
-        headers = hs,
-        body = bs,
+      { curlCode,
+        status,
+        headers,
+        statusLine,
+        body,
         -- note: we're holding onto the handle here..
         -- note: with this interface this is not neccessary.
         info = getInfo curl
       }
 
-doCurl :: Curl -> UrlString -> [CurlOption] -> IO CurlResponse
-doCurl curl url opts = do
-  setDefaultSslOpts curl url
-  setopts curl opts
-  setopt curl $ Url url
-  performWithResponse curl
-
--- | Get the headers associated with a particular URL.
--- Returns the status line and the key-value pairs for the headers.
-curlHead :: UrlString -> [CurlOption] -> IO (String, [(String, String)])
-curlHead url opts =
-  initialize >>= \curl -> do
-    ref <- newIORef []
-    --     setopt curl (Verbose True)
-    setopt curl $ Url url
-    setopt curl $ NoBody True
-    traverse_ (setopt curl) opts
-    setopt curl . HeadFun $ gatherOutput ref
-    void $ perform curl
-    lss <- readIORef ref
-    pure (parseStatusNHeaders (concatReverse [] lss))
-
--- | Get the headers associated with a particular URL.
--- Returns the status line and the key-value pairs for the headers.
-curlHead_ :: UrlString -> [CurlOption] -> IO (String, [(String, String)])
-curlHead_ url opts =
-  initialize >>= \curl -> do
-    (finalHeader, gatherHeader) <- newIncomingHeader
-    setopt curl (Url url)
-    setopt curl (NoBody True)
-    traverse_ (setopt curl) opts
-    setopt curl $ HeadFun $ callbackWriter_ gatherHeader
-    void $ perform curl
-    finalHeader
-
 -- utils
-
-concatReverse :: [a] -> [[a]] -> [a]
-concatReverse = foldl' (flip (<>))
 
 parseStatusNHeaders :: String -> (String, [(String, String)])
 parseStatusNHeaders ys = case intoLines [] ys of
@@ -175,56 +156,17 @@ parseHeader xs = case break (':' ==) xs of
   (as, _ : bs) -> (as, bs)
   (as, _) -> (as, mempty)
 
--- | 'curlMultiPost' perform a multi-part POST submission.
-curlMultiPost :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
-curlMultiPost s os ps =
-  initialize >>= \curl -> do
-    setopt curl (Verbose True)
-    setopt curl (Url s)
-    setopt curl (Multipart ps)
-    traverse_ (setopt curl) os
-    void $ perform curl
-
--- | 'curlPost' performs. a common POST operation, namely that
--- of submitting a sequence of name=value pairs.
-curlPost :: UrlString -> [String] -> IO ()
-curlPost s ps =
-  initialize >>= \curl -> do
-    setopt curl $ Verbose True
-    setopt curl $ PostFields ps
-    setopt curl $ CookieJar "cookies"
-    setopt curl $ Url s
-    void $ perform curl
-
--- Use 'callbackWriter' instead.
-
-easyWriter :: (String -> IO ()) -> WriteFunction
-easyWriter = callbackWriter
-
 -- | Imports data into the Haskell world and invokes the callback.
-callbackWriter :: (String -> IO ()) -> WriteFunction
+callbackWriter :: (CStringLen -> IO ()) -> WriteFunction
 callbackWriter f = WriteFunction $ \buf width num _ -> do
   let bytes :: CInt
       bytes = width * num
-  f =<< peekCStringLen (buf, fromIntegral bytes)
-  pure bytes
-
--- | Imports data into the Haskell world and invokes the callback.
-callbackWriter_ :: (CStringLen -> IO ()) -> WriteFunction
-callbackWriter_ f = WriteFunction $ \buf width num _ -> do
-  let bytes :: CInt
-      bytes = width * num
-  f (buf, fromIntegral bytes)
-  pure bytes
+  bytes <$ f (buf, fromIntegral bytes)
 
 -- | The output of Curl is ignored.  This function
 -- does not marshall data into Haskell.
 ignoreOutput :: WriteFunction
 ignoreOutput = WriteFunction $ \_ x y _ -> pure $ x * y
-
--- | Add chunks of data to an IORef as they arrive.
-gatherOutput :: IORef [String] -> WriteFunction
-gatherOutput r = callbackWriter $ modifyIORef r . (:)
 
 getResponseCode :: Curl -> IO Int
 getResponseCode c =

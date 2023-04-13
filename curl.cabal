@@ -25,7 +25,6 @@ library
     Network.Curl.Opts
     Network.Curl.Post
     Network.Curl.Types
-    Network.Curl.Code
   -- Network.Curl
   -- Network.Curl.Info
   hs-source-dirs:     src

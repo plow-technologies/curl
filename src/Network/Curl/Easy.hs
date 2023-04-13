@@ -28,7 +28,6 @@ import Foreign.C.String (CString, newCString, peekCString, withCString)
 import Foreign.C.Types (CChar, CInt (CInt))
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, freeHaskellFunPtr, nullPtr)
-import Network.Curl.Code
 import Network.Curl.Opts
 import Network.Curl.Post
 import Network.Curl.Types
@@ -50,14 +49,14 @@ setopt curl o = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
     easyUm r h =
       Unmarshaller
         { -- :: Int -> Word32     -> IO CurlCode
-          long = \i x -> toCode <$> easySetoptLong h i x,
+          long = \i x -> codeFromCInt <$> easySetoptLong h i x,
           --  :: Int -> Word64    -> IO CurlCode
-          llong = \i x -> toCode <$> easySetoptLLong h i x,
+          llong = \i x -> codeFromCInt <$> easySetoptLLong h i x,
           -- :: Int -> String   -> IO CurlCode
           string = \i x -> do
             cstr <- newCString x
             updateCleanup r i $ free cstr
-            toCode <$> easySetoptString h i cstr,
+            codeFromCInt <$> easySetoptString h i cstr,
           -- :: Int -> [String] -> IO CurlCode
           strings = \i x -> do
             -- slistAppend will copy its string argument
@@ -65,39 +64,39 @@ setopt curl o = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
                 addOne ip s = withCString s $ slistAppend ip
             ip <- foldM addOne nullPtr x
             updateCleanup r i $ curlSlistFree ip
-            toCode <$> easySetoptString h i (castPtr ip),
+            codeFromCInt <$> easySetoptString h i (castPtr ip),
           -- :: Int -> Ptr () -> IO a
-          pointer = \i x -> toCode <$> easySetoptPtr h i x,
+          pointer = \i x -> codeFromCInt <$> easySetoptPtr h i x,
           -- :: Int -> WriteFunction -> IO a
           writeFun = \i x -> do
             fp <- mkWriter x
             updateCleanup r i $ freeHaskellFunPtr fp
-            toCode <$> easySetoptWfun h i fp,
+            codeFromCInt <$> easySetoptWfun h i fp,
           -- :: Int -> ReadFunction -> IO a
           readFun = \i readFun -> do
             fp <- mkReader $ readToPrim readFun
             updateCleanup r i $ freeHaskellFunPtr fp
-            toCode <$> easySetoptRfun h i fp,
+            codeFromCInt <$> easySetoptRfun h i fp,
           -- :: Int -> ProgressFunction -> IO a
           progressFun = \i x -> do
             fp <- mkProgress x
             updateCleanup r i $ freeHaskellFunPtr fp
-            toCode <$> easySetoptFptr h i fp,
+            codeFromCInt <$> easySetoptFptr h i fp,
           -- :: Int -> DebugFunction -> IO a
           debugFun = \i dbgFun -> do
             fp <- mkDebugFun $ debugToPrim dbgFun
             updateCleanup r i $ freeHaskellFunPtr fp
-            toCode <$> easySetoptFptr h i fp,
+            codeFromCInt <$> easySetoptFptr h i fp,
           -- :: Int -> [HttpPost] -> IO a
           posts = \i x -> do
             p <- marshallPosts x
             updateCleanup r i $ curlFormfree p
-            toCode <$> easySetoptPtr h i p,
+            codeFromCInt <$> easySetoptPtr h i p,
           -- :: Int -> SSLCtxtFunction -> IO a
           sslctxt = \i x -> do
             p <- mkSslCtxtFun x
             updateCleanup r i $ freeHaskellFunPtr p
-            toCode <$> easySetoptFptr h i p,
+            codeFromCInt <$> easySetoptFptr h i p,
           -- :: Int -> Ptr () -> IO a
           ioctlFun = fptr h,
           -- :: Int -> Ptr () -> IO a
@@ -111,7 +110,7 @@ setopt curl o = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
         }
 
     fptr :: CurlHandle -> Int -> Ptr a -> IO CurlCode
-    fptr h i = fmap toCode . easySetoptPtr h i
+    fptr h i = fmap codeFromCInt . easySetoptPtr h i
 
     readToPrim :: ReadFunction -> ReadFunctionPrim
     readToPrim (ReadFunction f) a b c d =
@@ -122,10 +121,10 @@ setopt curl o = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
       0 <$ f curl (toEnum (fromIntegral b)) c d e
 
 perform :: Curl -> IO CurlCode
-perform curl = toCode <$> curlPrim curl (const easyPerformPrim)
+perform curl = codeFromCInt <$> curlPrim curl (const easyPerformPrim)
 
 curlGlobalInit :: CInt -> IO CurlCode
-curlGlobalInit v = toCode <$> curlGlobalInitPrim v
+curlGlobalInit v = codeFromCInt <$> curlGlobalInitPrim v
 
 curlVersionNumber :: IO Int
 curlVersionNumber = fromIntegral <$> curlVersionNum

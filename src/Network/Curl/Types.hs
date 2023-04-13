@@ -28,6 +28,7 @@ module Network.Curl.Types
     Port,
     Slist,
     Curl,
+    CurlCode (..),
     curlPrim,
     mkCurl,
     mkCurlWithCleanup,
@@ -35,6 +36,7 @@ module Network.Curl.Types
     shareCleanup,
     runCleanup,
     updateCleanup,
+    codeFromCInt,
   )
 where
 
@@ -44,6 +46,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
 import Data.Word
+import Foreign.C (CInt)
 import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr
 import Foreign.Ptr
@@ -64,6 +67,96 @@ type UrlString = String
 type Port = Word32
 
 data Slist
+
+data CurlCode
+  = CurlOK
+  | CurlUnspportedProtocol
+  | CurlFailedInit
+  | CurlUrlMalformat
+  | CurlUrlMalformatUser
+  | CurlCouldntResolveProxy
+  | CurlCouldntResolveHost
+  | CurlCouldntConnect
+  | CurlFtpWeirdServerReply
+  | CurlFtpAccessDenied
+  | CurlFtpUserPasswordIncorrect
+  | CurlFtpWeirdPassReply
+  | CurlFtpWeirdUserReply
+  | CurlFtpWeirdPASVReply
+  | CurlFtpWeird227Format
+  | CurlFtpCantGetHost
+  | CurlFtpCantReconnect
+  | CurlFtpCouldnSetBinary
+  | CurlPartialFile
+  | CurlFtpCouldntRetrFile
+  | CurlFtpWriteError
+  | CurlFtpQuoteError
+  | CurlHttpReturnedError
+  | CurlWriteError
+  | CurlMalformatError
+  | CurlFtpCouldnStorFile
+  | CurlReadError
+  | CurlOutOfMemory
+  | CurlOperationTimeout
+  | CurlFtpCouldntSetAscii
+  | CurlFtpPortFailed
+  | CurlFtpCouldntUseRest
+  | CurlFtpCouldntGetSize
+  | CurlHttpRangeError
+  | CurlHttpPostError
+  | CurlSslConnectError
+  | CurlBadDownloadResume
+  | CurlFileCouldntReadFile
+  | CurlLdapCannotBind
+  | CurlLdpapSearchFailed
+  | CurlLibraryNotFound
+  | CurlFunctionNotFound
+  | CurlAbortedByCallback
+  | CurlBadFunctionArgument
+  | CurlBadCallingOrder
+  | CurlInterfaceFailed
+  | CurlBadPasswordEntered
+  | CurlTooManyRedirects
+  | CurlUnknownTelnetOption
+  | CurlTelnetOptionSyntax
+  | CurlObsolete
+  | CurlSslPeerCertificate
+  | CurlGotNothing
+  | CurlSslEngineNotFound
+  | CurlSslEngineSetFailed
+  | CurlSendError
+  | CurlRecvError
+  | CurlShareInUse
+  | CurlSslCertProblem
+  | CurlSslCipher
+  | CurlSslCACert
+  | CurlBadContentEncoding
+  | CurlLdapInvalidUrl
+  | CurlFilesizeExceeded
+  | CurlFtpSslFailed
+  | CurlSendFailRewind
+  | CurlSslEngineInitFailed
+  | CurlLoginDenied
+  | CurlTFtpNotFound
+  | CurlTFtpPerm
+  | CurlTFtpDiskFull
+  | CurlTFtpIllegal
+  | CurlTFtpUnknownId
+  | CurlTFtpExists
+  | CurlTFtpNoSuchUser
+  | CurlConvFailed
+  | CurlConvReqd
+  | CurlSslCACertBadFile
+  | CurlRemoveFileNotFound
+  | CurlSsh
+  | CurlSslShutdownFailed
+  | CurlAgain
+  | CurlSslCRLBadFile
+  | CurlSslIssuerError
+  deriving stock (Eq, Show, Enum)
+
+codeFromCInt :: CInt -> CurlCode
+codeFromCInt x = toEnum (fromIntegral x)
 
 -- | Execute a "primitive" curl operation.
 -- NOTE: See warnings about the use of 'withForeignPtr'.

@@ -126,7 +126,7 @@ instance CurlBuffer LazyBS.ByteString where
 -- is completely done with curl (e.g., no forking or lazy returns)
 withCurlDo :: IO a -> IO a
 withCurlDo m = do
-  curl_global_init 3 -- initialize everything
+  curlGlobalInit 3 -- initialize everything
   finally m curl_global_cleanup
 
 -- | Set a list of options on a Curl handle.

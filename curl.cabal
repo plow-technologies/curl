@@ -34,9 +34,14 @@ library
   extra-libraries:    curl
   default-extensions:
     CPP
+    DeriveAnyClass
     DeriveGeneric
     DerivingStrategies
+    DerivingVia
+    EmptyDataDecls
     ForeignFunctionInterface
+    ForeignFunctionInterface
+    LambdaCase
     LambdaCase
     NamedFieldPuns
     OverloadedStrings

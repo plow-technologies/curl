@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 --------------------------------------------------------------------
 
 --------------------------------------------------------------------
@@ -20,6 +18,7 @@
 module Network.Curl.Easy where
 
 import Control.Monad (foldM)
+import Control.Monad.Catch (MonadThrow (throwM))
 import Data.IORef (IORef)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64)
@@ -35,9 +34,15 @@ import Network.Curl.Types
 initialize :: IO Curl
 initialize = mkCurl =<< easyInitialize
 
-setopt :: Curl -> CurlOption -> IO CurlCode
-setopt curl o = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
+setopt :: Curl -> CurlOption -> IO ()
+setopt curl o =
+  doPrim >>= \case
+    CurlOK -> pure ()
+    rc -> throwM rc
   where
+    doPrim :: IO CurlCode
+    doPrim = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
+
     easyUm :: IORef OptionMap -> CurlHandle -> Unmarshaller CurlCode
     easyUm r h =
       Unmarshaller

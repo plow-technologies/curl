@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 -- |
 -- Module    : Network.Curl
 -- Copyright : (c) 2007-2009, Galois Inc
@@ -70,8 +68,8 @@ setopts curl = traverse_ (setopt curl)
 curlGet :: UrlString -> [CurlOption] -> IO ()
 curlGet url opts =
   initialize >>= \curl -> do
-    void $ setopt curl (FailOnError True)
-    void $ setopt curl (Url url)
+    setopt curl (FailOnError True)
+    setopt curl (Url url)
     -- Note: later options may (and should, probably) override these defaults.
     setDefaultSslOpts curl url
     traverse_ (setopt curl) opts
@@ -92,10 +90,10 @@ curlGetString :: UrlString -> [CurlOption] -> IO (CurlCode, ByteString)
 curlGetString url opts =
   initialize >>= \curl -> do
     (finalBody, gatherBody) <- newIncomingBuffer
-    void . setopt curl $ FailOnError True
+    setopt curl $ FailOnError True
     setDefaultSslOpts curl url
-    void . setopt curl $ Url url
-    void . setopt curl . WriteFunc $ callbackWriter_ gatherBody
+    setopt curl $ Url url
+    setopt curl . WriteFun $ callbackWriter_ gatherBody
     traverse_ (setopt curl) opts
     (,) <$> perform curl <*> finalBody
 
@@ -118,9 +116,9 @@ curlGetResponse :: UrlString -> [CurlOption] -> IO CurlResponse
 curlGetResponse url opts = do
   curl <- initialize
   -- Note: later options may (and should, probably) override these defaults.
-  void . setopt curl $ FailOnError True
+  setopt curl $ FailOnError True
   setDefaultSslOpts curl url
-  void . setopt curl $ Url url
+  setopt curl $ Url url
   traverse_ (setopt curl) opts
   -- note that users cannot over-write the body and header handler
   -- which makes sense because otherwise we will pure a bogus reposnse.
@@ -129,9 +127,7 @@ curlGetResponse url opts = do
 -- | Perform the actions already specified on the handle.
 -- Collects useful information about the returned message.
 -- Note that this function sets the
--- 'CurlWriteFunction' and 'CurlHeaderFunction' options.
--- The returned payload is overloaded over the representation of
--- both headers and body via the 'CurlResponse_' type.
+-- 'WriteFun' and 'HeadFun' options
 performWithResponse :: Curl -> IO CurlResponse
 performWithResponse curl = do
   (finalHeader, gatherHeader) <- newIncomingHeader
@@ -139,8 +135,8 @@ performWithResponse curl = do
   -- Instead of allocating a separate handler for each
   -- request we could just set this options one and forall
   -- and just clear the IORefs.
-  void . setopt curl . WriteFunc $ callbackWriter_ gatherBody
-  void . setopt curl . HeaderFunc $ callbackWriter_ gatherHeader
+  setopt curl . WriteFun $ callbackWriter_ gatherBody
+  setopt curl . HeadFun $ callbackWriter_ gatherHeader
   rc <- perform curl
   rspCode <- getResponseCode curl
   (st, hs) <- finalHeader
@@ -161,7 +157,7 @@ doCurl :: Curl -> UrlString -> [CurlOption] -> IO CurlResponse
 doCurl curl url opts = do
   setDefaultSslOpts curl url
   setopts curl opts
-  void . setopt curl $ Url url
+  setopt curl $ Url url
   performWithResponse curl
 
 -- | Get the headers associated with a particular URL.
@@ -172,10 +168,10 @@ curlHead url opts =
     do
       ref <- newIORef []
       --     setopt curl (Verbose True)
-      void $ setopt curl $ Url url
-      void $ setopt curl $ NoBody True
+      setopt curl $ Url url
+      setopt curl $ NoBody True
       traverse_ (setopt curl) opts
-      void . setopt curl . HeaderFunc $ gatherOutput ref
+      setopt curl . HeadFun $ gatherOutput ref
       void $ perform curl
       lss <- readIORef ref
       pure (parseStatusNHeaders (concatReverse [] lss))
@@ -186,10 +182,10 @@ curlHead_ :: UrlString -> [CurlOption] -> IO (String, [(String, String)])
 curlHead_ url opts =
   initialize >>= \curl -> do
     (finalHeader, gatherHeader) <- newIncomingHeader
-    void $ setopt curl (Url url)
-    void $ setopt curl (NoBody True)
+    setopt curl (Url url)
+    setopt curl (NoBody True)
     traverse_ (setopt curl) opts
-    void . setopt curl $ HeaderFunc $ callbackWriter_ gatherHeader
+    setopt curl $ HeadFun $ callbackWriter_ gatherHeader
     void $ perform curl
     finalHeader
 
@@ -222,9 +218,9 @@ parseHeader xs = case break (':' ==) xs of
 curlMultiPost :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
 curlMultiPost s os ps =
   initialize >>= \curl -> do
-    void $ setopt curl (Verbose True)
-    void $ setopt curl (Url s)
-    void $ setopt curl (Multipart ps)
+    setopt curl (Verbose True)
+    setopt curl (Url s)
+    setopt curl (Multipart ps)
     traverse_ (setopt curl) os
     void $ perform curl
 
@@ -233,10 +229,10 @@ curlMultiPost s os ps =
 curlPost :: UrlString -> [String] -> IO ()
 curlPost s ps =
   initialize >>= \curl -> do
-    void . setopt curl $ Verbose True
-    void . setopt curl $ PostFields ps
-    void . setopt curl $ CookieJar "cookies"
-    void . setopt curl $ Url s
+    setopt curl $ Verbose True
+    setopt curl $ PostFields ps
+    setopt curl $ CookieJar "cookies"
+    setopt curl $ Url s
     void $ perform curl
 
 -- Use 'callbackWriter' instead.

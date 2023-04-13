@@ -1,14 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
-
---------------------------------------------------------------------
-
---------------------------------------------------------------------
-
 -- |
 -- Module    : Network.Curl.Types
 -- Copyright : (c) Galois Inc 2007-2009
@@ -33,18 +22,16 @@ module Network.Curl.Types
     CurlCode (..),
     Info (..),
     InfoValue (..),
+    OptionMap,
     curlPrim,
     mkCurl,
-    mkCurlWithCleanup,
-    OptionMap,
-    shareCleanup,
     runCleanup,
     updateCleanup,
     codeFromCInt,
   )
 where
 
-import Control.Concurrent (MVar, newMVar, putMVar, takeMVar, withMVar)
+import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Exception (Exception (displayException))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.IntMap (IntMap)
@@ -56,7 +43,6 @@ import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
 import Foreign.Ptr (Ptr)
 import GHC.Generics (Generic)
-import Control.Monad (unless)
 
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.
@@ -222,20 +208,16 @@ data InfoValue
 -- NOTE: See warnings about the use of 'withForeignPtr'.
 curlPrim :: Curl -> (IORef OptionMap -> CurlHandle -> IO a) -> IO a
 curlPrim Curl {handle, cleanup} f =
-  withMVar handle $ \h -> withForeignPtr h . f $ cleanup
+  withMVar handle $ \curl -> withForeignPtr curl . f $ cleanup
 
 -- | Allocates a Haskell handle from a C handle.
 mkCurl :: CurlHandle -> IO Curl
-mkCurl h = mkCurlWithCleanup h emptyOptionMap
-
--- | Allocates a Haskell handle from a C handle.
-mkCurlWithCleanup :: CurlHandle -> OptionMap -> IO Curl
-mkCurlWithCleanup h m = do
-  cleanup <- newIORef m
-  fptr <- newForeignPtr_ h
+mkCurl curl = do
+  cleanup <- newIORef emptyOptionMap
+  fptr <- newForeignPtr_ curl
   handle <- newMVar fptr
   Foreign.Concurrent.addForeignPtrFinalizer fptr $
-    easyCleanup h *> runCleanup cleanup
+    easyCleanup curl *> runCleanup cleanup
   pure Curl {handle, cleanup}
 
 -- Admin code for cleaning up marshalled data.
@@ -246,13 +228,6 @@ runCleanup :: IORef OptionMap -> IO ()
 runCleanup r = do
   cleanupOptionMap =<< readIORef r
   writeIORef r emptyOptionMap
-
-shareCleanup :: IORef OptionMap -> IO OptionMap
-shareCleanup r = do
-  old <- readIORef r
-  new <- dupOptionMap old
-  writeIORef r new
-  pure new
 
 updateCleanup :: IORef OptionMap -> Int -> IO () -> IO ()
 updateCleanup r option act =
@@ -283,38 +258,5 @@ setOptionMap opt new opts = do
 -- | Execute all IO actions in the map.
 cleanupOptionMap :: OptionMap -> IO ()
 cleanupOptionMap = sequence_ . IntMap.elems
-
--- | Replace the actions in a map, with actions that
--- will only be executed the second time they are invoked.
-dupOptionMap :: OptionMap -> IO OptionMap
-dupOptionMap = fmap IntMap.fromList . traverse dup . IntMap.assocs
-  where
-    dup :: (a, IO ()) -> IO (a, IO ())
-    dup (x, old) = (x,) <$> shareIO old
-
--- Share a cleanup action.  When we share cleanup duty between two handles
--- we need to ensure that the first handle to perform the cleanup will do
--- nothing (because the other handle still needs the resources).
-shareIO :: IO () -> IO (IO ())
-shareIO act =
-  newMVar False >>= \v ->
-    pure $
-      takeMVar v >>= \case
-        True -> act
-        False -> putMVar v True
-
---------------------------------------------------------------------------------
-
-{- UNUSED:
--- FFI for inalizers.
-
--- | Make a finalizer from an IO action.
-mkIOfin :: IO a -> IO (FinalizerPtr b)
-mkIOfin m = mfix (\ptr -> ioFinalizer (m >> freeHaskellFunPtr ptr))
-
-foreign import ccall "wrapper"
-  ioFinalizer :: IO () -> IO (FinalizerPtr a)
-
--}
 
 foreign import ccall "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()

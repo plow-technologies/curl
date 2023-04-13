@@ -1,7 +1,3 @@
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RecordWildCards #-}
-
 -- |
 -- Module    : Network.Curl.Opts
 -- Copyright : (c) Galois Inc 2007-2009
@@ -53,9 +49,9 @@ data CurlOption
   | -- | buffer for curl to deposit error messages (must at least CURL_ERROR_SIZE bytes long). Uses standard error if not specified.
     ErrorBuffer (Ptr CChar)
   | -- | callback to handle incoming data.
-    WriteFunc WriteFunction
+    WriteFun WriteFunction
   | -- | callback for supplying outgoing\/uploaded data.
-    ReadFunc ReadFunction
+    ReadFun ReadFunction
   | -- | number of seconds before timing out curl operation\/request.
     Timeout Word32
   | -- | expected size of uploaded data.
@@ -133,7 +129,7 @@ data CurlOption
   | -- | Use PUT to upload data.
     Put Bool
   | -- | callback for showing progress
-    ProgressFunc ProgressFunction
+    ProgressFun ProgressFunction
   | -- | state argumentto pass to progress callback.
     ProgressData (Ptr ())
   | -- | Control if the Referer: field is set upon following Location: redirects
@@ -173,7 +169,7 @@ data CurlOption
   | -- | max number of seconds to wait for the initial connection to happen.
     ConnectTimeout Word32
   | -- | callback used to handle _incoming_ header data.
-    HeaderFunc WriteFunction
+    HeadFun WriteFunction
   | -- | Revert to a GET for the next request.
     Get Bool
   | -- | Perform Common name checking in peer certificate (1=> existence;2=> matches hostname.)
@@ -203,7 +199,7 @@ data CurlOption
   | -- | FTP commands to issue after connection and transfer mode has been set.
     PreQuote [String]
   | -- | callback to catch and report transfer operations.
-    DebugFunc DebugFunction
+    DebugFun DebugFunction
   | -- | state argument to pass to debug callback.
     DebugData (Ptr ())
   | -- | Signal the start of a cookie session, ignoring previous session cookies.
@@ -231,7 +227,7 @@ data CurlOption
   | -- | State your authentication preferences.
     Auth [HttpAuth]
   | -- | callback to handle setting up Ssl connections; have the power to abort them.
-    SslCtxFunction SslCtxtFunction
+    SslCtxFun SslCtxtFunction
   | -- | state argument to pass into the above callback.
     SslCtxData (Ptr ())
   | -- | Have remote directories be created if not already there
@@ -261,7 +257,7 @@ data CurlOption
   | -- | Twiddle if TLS or Ssl is used.
     FtpSslAuth Word32
   | -- | somewhat obscure callback for handling read stream resets.
-    IoctlFunction (Ptr ())
+    IoctlFun (Ptr ())
   | -- | state argument to the above.
     IoctlData (Ptr ())
   | -- | The string to use when server asks for account info.
@@ -281,11 +277,11 @@ data CurlOption
   | -- | If enabled, perform all steps up until actual transfer.
     ConnectOnly Bool
   | -- | callback for doing character translations from network format.
-    ConvFromNetworkFunction (Ptr ())
+    ConvFromNetworkFun (Ptr ())
   | -- | callback for doing character translations to network format.
-    ConvToNetworkFunction (Ptr ())
+    ConvToNetworkFun (Ptr ())
   | -- | callback for translating UTF8 into host encoding.
-    ConvFromUtf8Function (Ptr ())
+    ConvFromUtf8Fun (Ptr ())
   | -- | Specifies throttle value for outgoing data.
     MaxSendSpeedLarge Word64
   | -- | Specifies throttle for incoming data.
@@ -293,7 +289,7 @@ data CurlOption
   | -- | Alternative (to user:pass) for FTP authentication; weird.
     FtpAlternativeToUser String
   | -- | callback that's injected between socket creation and connection.
-    SockOptFunction (Ptr ())
+    SockOptFun (Ptr ())
   | -- | state argument to the above.
     SockOptData (Ptr ())
   | -- | Enable the Ssl session id cache; default is on, so use this to disable.
@@ -361,16 +357,17 @@ data HttpAuth
 
 toHttpAuthMask :: [HttpAuth] -> Word32
 toHttpAuthMask [] = 0
-toHttpAuthMask (x : xs) =
-  let vs = toHttpAuthMask xs
-   in case x of
-        HttpAuthNone -> vs
-        HttpAuthBasic -> 0x1 .|. vs
-        HttpAuthDigest -> 0x2 .|. vs
-        HttpAuthGSSNegotiate -> 0x4 .|. vs
-        HttpAuthNTLM -> 0x8 .|. vs
-        HttpAuthAny -> complement 0 .|. vs
-        HttpAuthAnySafe -> complement 1 .|. vs
+toHttpAuthMask (x : xs) = case x of
+  HttpAuthNone -> vs
+  HttpAuthBasic -> 0x1 .|. vs
+  HttpAuthDigest -> 0x2 .|. vs
+  HttpAuthGSSNegotiate -> 0x4 .|. vs
+  HttpAuthNTLM -> 0x8 .|. vs
+  HttpAuthAny -> complement 0 .|. vs
+  HttpAuthAnySafe -> complement 1 .|. vs
+  where
+    vs :: Word32
+    vs = toHttpAuthMask xs
 
 data SshAuthType
   = SshAuthAny
@@ -383,15 +380,16 @@ data SshAuthType
 
 toSshAuthMask :: [SshAuthType] -> Word32
 toSshAuthMask [] = 0
-toSshAuthMask (x : xs) =
-  let vs = toSshAuthMask xs
-   in case x of
-        SshAuthAny -> complement 0 .|. vs
-        SshAuthNone -> vs
-        SshAuthPublickey -> 1 .|. vs
-        SshAuthPassword -> 2 .|. vs
-        SshAuthHost -> 4 .|. vs
-        SshAuthKeyboard -> 8 .|. vs
+toSshAuthMask (x : xs) = case x of
+  SshAuthAny -> complement 0 .|. vs
+  SshAuthNone -> vs
+  SshAuthPublickey -> 1 .|. vs
+  SshAuthPassword -> 2 .|. vs
+  SshAuthHost -> 4 .|. vs
+  SshAuthKeyboard -> 8 .|. vs
+  where
+    vs :: Word32
+    vs = toSshAuthMask xs
 
 newtype WriteFunction
   = WriteFunction
@@ -500,8 +498,8 @@ unmarshallOption um@Unmarshaller {..} = \case
   Range x -> string (withObject 7) x
   InFile x -> string (withObject 9) x
   ErrorBuffer x -> unmarshalCptr um (withObject 10) x
-  WriteFunc x -> writeFun (withFunc 11) x
-  ReadFunc x -> readFun (withFunc 12) x
+  WriteFun x -> writeFun (withFunc 11) x
+  ReadFun x -> readFun (withFunc 12) x
   Timeout x -> long (withLong 13) x
   InFileSize x -> long (withLong 14) x
   PostFields x -> string (withObject 15) $ intercalate "&" x
@@ -540,7 +538,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   FollowLocation x -> unmarshalBool um (withLong 52) x
   TransferTextASCII x -> unmarshalBool um (withLong 53) x
   Put x -> unmarshalBool um (withLong 54) x
-  ProgressFunc x -> progressFun (withFunc 56) x
+  ProgressFun x -> progressFun (withFunc 56) x
   ProgressData x -> pointer (withObject 57) x
   AutoReferer x -> unmarshalBool um (withLong 58) x
   ProxyPort x -> long (withLong 59) x
@@ -560,7 +558,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   RandomFile x -> string (withObject 76) x
   EgdSocket x -> string (withObject 77) x
   ConnectTimeout x -> long (withLong 78) x
-  HeaderFunc x -> writeFun (withFunc 79) x
+  HeadFun x -> writeFun (withFunc 79) x
   Get x -> unmarshalBool um (withLong 80) x
   SslVerifyHost x -> long (withLong 81) x
   CookieJar x -> string (withObject 82) x
@@ -575,7 +573,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   DnsUseGlobalCache x -> unmarshalBool um (withLong 91) x
   DnsCacheTimeout x -> long (withLong 92) x
   PreQuote x -> strings (withObject 93) x
-  DebugFunc x -> debugFun (withFunc 94) x
+  DebugFun x -> debugFun (withFunc 94) x
   DebugData x -> pointer (withObject 95) x
   CookieSession x -> unmarshalBool um (withLong 96) x
   CaPath x -> string (withObject 97) x
@@ -589,7 +587,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   UnrestrictedAuth x -> unmarshalBool um (withLong 105) x
   FtppUseEPRT x -> unmarshalBool um (withLong 106) x
   Auth xs -> long (withLong 107) (toHttpAuthMask xs)
-  SslCtxFunction x -> sslctxt (withFunc 108) x
+  SslCtxFun x -> sslctxt (withFunc 108) x
   SslCtxData x -> pointer (withObject 109) x
   FtpCreateMissingDirs x -> unmarshalBool um (withLong 110) x
   ProxyAuth x -> long (withLong 111) (toHttpAuthMask x)
@@ -604,7 +602,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   PostFieldSizeLarge x -> llong (withOffset 120) x
   TcpNoDelay x -> unmarshalBool um (withLong 121) x
   FtpSslAuth x -> unmarshalEnum um (withLong 129) x
-  IoctlFunction x -> ioctlFun (withFunc 130) x
+  IoctlFun x -> ioctlFun (withFunc 130) x
   IoctlData x -> pointer (withObject 131) x
   FtpAccount x -> string (withObject 134) x
   CookieList x -> string (withObject 135) x
@@ -614,13 +612,13 @@ unmarshallOption um@Unmarshaller {..} = \case
   LocalPort x -> long (withLong 139) x
   LocalPortRange x -> long (withLong 140) x
   ConnectOnly x -> unmarshalBool um (withLong 141) x
-  ConvFromNetworkFunction x -> convFromNetwork (withFunc 142) x
-  ConvToNetworkFunction x -> convToNetwork (withFunc 143) x
-  ConvFromUtf8Function x -> convFromUtf8 (withFunc 144) x
+  ConvFromNetworkFun x -> convFromNetwork (withFunc 142) x
+  ConvToNetworkFun x -> convToNetwork (withFunc 143) x
+  ConvFromUtf8Fun x -> convFromUtf8 (withFunc 144) x
   MaxSendSpeedLarge x -> llong (withOffset 145) x
   MaxRecvSpeedLarge x -> llong (withOffset 146) x
   FtpAlternativeToUser x -> string (withObject 147) x
-  SockOptFunction x -> sockoptFun (withFunc 148) x
+  SockOptFun x -> sockoptFun (withFunc 148) x
   SockOptData x -> pointer (withObject 149) x
   SslSessionIdCache x -> unmarshalBool um (withLong 150) x
   SshAuthTypes xs -> long (withLong 151) (toSshAuthMask xs)

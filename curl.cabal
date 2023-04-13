@@ -22,11 +22,12 @@ extra-source-files: CHANGELOG.md
 library
   exposed-modules:
     Network.Curl.Easy
+    Network.Curl.Info
     Network.Curl.Opts
     Network.Curl.Post
     Network.Curl.Types
+
   -- Network.Curl
-  -- Network.Curl.Info
   hs-source-dirs:     src
   include-dirs:       cbits
   c-sources:          cbits/curlc.c
@@ -39,6 +40,7 @@ library
     LambdaCase
     NamedFieldPuns
     OverloadedStrings
+    PatternSynonyms
     RecordWildCards
     ScopedTypeVariables
     TypeApplications
@@ -52,6 +54,7 @@ library
     , base        <5
     , bytestring  >=0.9
     , containers
+    , exceptions
 
 source-repository head
   type:     git

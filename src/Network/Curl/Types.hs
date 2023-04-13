@@ -1,5 +1,6 @@
 {-# LANGUAGE CApiFFI #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE LambdaCase #-}
@@ -28,6 +29,7 @@ module Network.Curl.Types
     Port,
     Slist,
     Curl,
+    pattern CurlExitSuccess,
     CurlCode (..),
     curlPrim,
     mkCurl,
@@ -41,6 +43,7 @@ module Network.Curl.Types
 where
 
 import Control.Concurrent
+import Control.Exception (Exception)
 import Data.IORef
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -67,6 +70,9 @@ type UrlString = String
 type Port = Word32
 
 data Slist
+
+pattern CurlExitSuccess :: CInt
+pattern CurlExitSuccess = 0
 
 data CurlCode
   = CurlOK
@@ -154,6 +160,7 @@ data CurlCode
   | CurlSslCRLBadFile
   | CurlSslIssuerError
   deriving stock (Eq, Show, Enum)
+  deriving anyclass (Exception)
 
 codeFromCInt :: CInt -> CurlCode
 codeFromCInt x = toEnum (fromIntegral x)

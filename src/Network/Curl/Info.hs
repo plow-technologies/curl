@@ -15,9 +15,7 @@
 --
 -- Accessing the properties of a curl handle's current state\/request.
 module Network.Curl.Info
-  ( Info (..),
-    InfoValue (..),
-    getInfo,
+  ( getInfo,
   )
 where
 
@@ -27,48 +25,7 @@ import Foreign.C (CChar, CInt (CInt), CString, peekCString)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (peek, peekByteOff, sizeOf))
-import GHC.Generics (Generic)
 import Network.Curl.Types
-
-data Info
-  = EffectiveUrl
-  | ResponseCode
-  | TotalTime
-  | NameLookupTime
-  | ConnectTime
-  | PreTransferTime
-  | SizeUpload
-  | SizeDownload
-  | SpeedDownload
-  | SpeedUpload
-  | HeaderSize
-  | RequestSize
-  | SslVerifyResult
-  | Filetime
-  | ContentLengthDownload
-  | ContentLengthUpload
-  | StartTransferTime
-  | ContentType
-  | RedirectTime
-  | RedirectCount
-  | Private
-  | HttpConnectCode
-  | HttpAuthAvail
-  | ProxyAuthAvail
-  | OSErrno
-  | NumConnects
-  | SslEngines
-  | CookieList
-  | LastSocket
-  | FtpEntryPath
-  deriving stock (Show, Eq, Generic, Ord, Enum, Bounded)
-
-data InfoValue
-  = String String
-  | Long Word32
-  | Double Double
-  | List [String]
-  deriving stock (Show, Eq, Generic)
 
 getInfo :: Curl -> Info -> IO InfoValue
 getInfo curl = \case

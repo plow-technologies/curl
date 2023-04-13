@@ -21,13 +21,13 @@ extra-source-files: CHANGELOG.md
 
 library
   exposed-modules:
+    Network.Curl
     Network.Curl.Easy
     Network.Curl.Info
     Network.Curl.Opts
     Network.Curl.Post
     Network.Curl.Types
 
-  -- Network.Curl
   hs-source-dirs:     src
   include-dirs:       cbits
   c-sources:          cbits/curlc.c
@@ -43,6 +43,7 @@ library
     PatternSynonyms
     RecordWildCards
     ScopedTypeVariables
+    TupleSections
     TypeApplications
 
   ghc-options:

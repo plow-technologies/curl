@@ -1,5 +1,4 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE CApiFFI #-}
 
 --------------------------------------------------------------------
 
@@ -35,12 +34,6 @@ import Network.Curl.Types
 -- | Initialise a curl instance
 initialize :: IO Curl
 initialize = mkCurl =<< easyInitialize
-
-duphandle :: Curl -> IO Curl
-duphandle curl = curlPrim curl $ \r h -> do
-  h1 <- easyDuphandle h
-  cleanup <- shareCleanup r
-  mkCurlWithCleanup h1 cleanup
 
 setopt :: Curl -> CurlOption -> IO CurlCode
 setopt curl o = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
@@ -134,49 +127,49 @@ curlVersionString = peekCString =<< curlVersionStr
 
 -- FFI decls
 
-foreign import capi "curl_version_num"
+foreign import ccall "curl_version_num"
   curlVersionNum :: IO CInt
 
-foreign import capi "curl_version_str"
+foreign import ccall "curl_version_str"
   curlVersionStr :: IO CString
 
-foreign import capi "curl/easy.h curlGlobalInit"
+foreign import ccall "curl/easy.h curl_global_init"
   curlGlobalInitPrim :: CInt -> IO CInt
 
-foreign import capi "curl/easy.h curl_global_cleanup"
+foreign import ccall "curl/easy.h curl_global_cleanup"
   curlGlobalCleanup :: IO ()
 
-foreign import capi "curl/easy.h curl_easy_init"
+foreign import ccall "curl/easy.h curl_easy_init"
   easyInitialize :: IO CurlHandle
 
-foreign import capi "curl/easy.h curl_easy_perform"
+foreign import ccall "curl/easy.h curl_easy_perform"
   easyPerformPrim :: CurlHandle -> IO CInt
 
-foreign import capi "curl_easy_duphandle"
+foreign import ccall "curl_easy_duphandle"
   easyDuphandle :: CurlHandle -> IO CurlHandle
 
-foreign import capi "curl_easy_reset"
+foreign import ccall "curl_easy_reset"
   easyReset :: CurlHandle -> IO ()
 
-foreign import capi "curl_easy_setopt_long"
+foreign import ccall "curl_easy_setopt_long"
   easySetoptLong :: CurlHandle -> Int -> Word32 -> IO CInt
 
-foreign import capi "curl_easy_setopt_longlong"
+foreign import ccall "curl_easy_setopt_longlong"
   easySetoptLLong :: CurlHandle -> Int -> Word64 -> IO CInt
 
-foreign import capi "curl_easy_setopt_string"
+foreign import ccall "curl_easy_setopt_string"
   easySetoptString :: CurlHandle -> Int -> Ptr CChar -> IO CInt
 
-foreign import capi "curl_easy_setopt_ptr"
+foreign import ccall "curl_easy_setopt_ptr"
   easySetoptPtr :: CurlHandle -> Int -> Ptr a -> IO CInt
 
-foreign import capi "curl_easy_setopt_ptr"
+foreign import ccall "curl_easy_setopt_ptr"
   easySetoptFptr :: CurlHandle -> Int -> FunPtr a -> IO CInt
 
-foreign import capi "curl_easy_setopt_ptr"
+foreign import ccall "curl_easy_setopt_ptr"
   easySetoptWfun :: CurlHandle -> Int -> FunPtr WriteFunction -> IO CInt
 
-foreign import capi "curl_easy_setopt_ptr"
+foreign import ccall "curl_easy_setopt_ptr"
   easySetoptRfun :: CurlHandle -> Int -> FunPtr ReadFunctionPrim -> IO CInt
 
 foreign import ccall "wrapper"

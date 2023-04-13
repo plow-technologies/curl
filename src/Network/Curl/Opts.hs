@@ -24,6 +24,15 @@ import GHC.Generics (Generic)
 import Network.Curl.Post (HttpPost)
 import Network.Curl.Types (Curl, CurlHandle, Port, UrlString)
 
+pattern GET :: [CurlOption]
+pattern GET = [Post False, NoBody False]
+
+pattern POST :: [CurlOption]
+pattern POST = [Post True, NoBody False]
+
+pattern HEAD :: [CurlOption]
+pattern HEAD = [Post False, NoBody True]
+
 data CurlOption
   = -- | external pointer to pass to as 'WriteFunction's last argument.
     FileObj (Ptr ())
@@ -164,7 +173,7 @@ data CurlOption
   | -- | max number of seconds to wait for the initial connection to happen.
     ConnectTimeout Word32
   | -- | callback used to handle _incoming_ header data.
-    HeaderFunction WriteFunction
+    HeaderFunc WriteFunction
   | -- | Revert to a GET for the next request.
     Get Bool
   | -- | Perform Common name checking in peer certificate (1=> existence;2=> matches hostname.)
@@ -551,7 +560,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   RandomFile x -> string (withObject 76) x
   EgdSocket x -> string (withObject 77) x
   ConnectTimeout x -> long (withLong 78) x
-  HeaderFunction x -> writeFun (withFunc 79) x
+  HeaderFunc x -> writeFun (withFunc 79) x
   Get x -> unmarshalBool um (withLong 80) x
   SslVerifyHost x -> long (withLong 81) x
   CookieJar x -> string (withObject 82) x

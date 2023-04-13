@@ -1,4 +1,3 @@
-{-# LANGUAGE CApiFFI #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE EmptyDataDecls #-}
@@ -30,7 +29,10 @@ module Network.Curl.Types
     Slist,
     Curl,
     pattern CurlExitSuccess,
+    CurlOtherError (..),
     CurlCode (..),
+    Info (..),
+    InfoValue (..),
     curlPrim,
     mkCurl,
     mkCurlWithCleanup,
@@ -42,18 +44,19 @@ module Network.Curl.Types
   )
 where
 
-import Control.Concurrent
-import Control.Exception (Exception)
-import Data.IORef
+import Control.Concurrent (MVar, newMVar, putMVar, takeMVar, withMVar)
+import Control.Exception (Exception (displayException))
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
-import Data.Word
+import Data.Word (Word32)
 import Foreign.C (CInt)
 import Foreign.Concurrent (addForeignPtrFinalizer)
-import Foreign.ForeignPtr
-import Foreign.Ptr
+import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
+import Foreign.Ptr (Ptr)
 import GHC.Generics (Generic)
+import Control.Monad (unless)
 
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.
@@ -73,6 +76,16 @@ data Slist
 
 pattern CurlExitSuccess :: CInt
 pattern CurlExitSuccess = 0
+
+data CurlOtherError
+  = InvalidResponse String
+  | UnexpectedResponse InfoValue
+  deriving stock (Show, Generic)
+
+instance Exception CurlOtherError where
+  displayException = \case
+    InvalidResponse s -> "Invalid response value: " <> s
+    UnexpectedResponse iv -> "Unexpected response value " <> show iv
 
 data CurlCode
   = CurlOK
@@ -165,6 +178,46 @@ data CurlCode
 codeFromCInt :: CInt -> CurlCode
 codeFromCInt x = toEnum (fromIntegral x)
 
+data Info
+  = EffectiveUrl
+  | ResponseCode
+  | TotalTime
+  | NameLookupTime
+  | ConnectTime
+  | PreTransferTime
+  | SizeUpload
+  | SizeDownload
+  | SpeedDownload
+  | SpeedUpload
+  | HeaderSize
+  | RequestSize
+  | SslVerifyResult
+  | Filetime
+  | ContentLengthDownload
+  | ContentLengthUpload
+  | StartTransferTime
+  | ContentType
+  | RedirectTime
+  | RedirectCount
+  | Private
+  | HttpConnectCode
+  | HttpAuthAvail
+  | ProxyAuthAvail
+  | OSErrno
+  | NumConnects
+  | SslEngines
+  | CookieList
+  | LastSocket
+  | FtpEntryPath
+  deriving stock (Show, Eq, Generic, Ord, Enum, Bounded)
+
+data InfoValue
+  = String String
+  | Long Word32
+  | Double Double
+  | List [String]
+  deriving stock (Show, Eq, Generic)
+
 -- | Execute a "primitive" curl operation.
 -- NOTE: See warnings about the use of 'withForeignPtr'.
 curlPrim :: Curl -> (IORef OptionMap -> CurlHandle -> IO a) -> IO a
@@ -243,12 +296,12 @@ dupOptionMap = fmap IntMap.fromList . traverse dup . IntMap.assocs
 -- we need to ensure that the first handle to perform the cleanup will do
 -- nothing (because the other handle still needs the resources).
 shareIO :: IO () -> IO (IO ())
-shareIO act = do
-  v <- newMVar False
-  pure $
-    takeMVar v >>= \case
-      True -> act
-      False -> putMVar v True
+shareIO act =
+  newMVar False >>= \v ->
+    pure $
+      takeMVar v >>= \case
+        True -> act
+        False -> putMVar v True
 
 --------------------------------------------------------------------------------
 
@@ -264,4 +317,4 @@ foreign import ccall "wrapper"
 
 -}
 
-foreign import capi "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()
+foreign import ccall "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()

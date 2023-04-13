@@ -13,6 +13,7 @@
 -- upon shutting down the curl session.
 module Network.Curl.Types
   ( CurlHandle,
+    CurlResponse (..),
     UrlString,
     Port,
     Slist,
@@ -28,11 +29,14 @@ module Network.Curl.Types
     runCleanup,
     updateCleanup,
     codeFromCInt,
+    withCheckCurlCode,
   )
 where
 
 import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Exception (Exception (displayException))
+import Control.Monad.Catch (MonadThrow (throwM))
+import Data.ByteString.Lazy (ByteString)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -43,6 +47,18 @@ import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
 import Foreign.Ptr (Ptr)
 import GHC.Generics (Generic)
+
+-- | 'CurlResponse' is a record type encoding all the information
+-- embodied in a response to your Curl request. Currently only used
+-- to gather up the results of doing a GET in 'curlGetResponse'.
+data CurlResponse = CurlResponse
+  { curlCode :: CurlCode,
+    status :: Int,
+    statusLine :: String,
+    headers :: [(String, String)],
+    body :: ByteString,
+    info :: Info -> IO InfoValue
+  }
 
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.
@@ -160,6 +176,12 @@ data CurlCode
   | CurlSslIssuerError
   deriving stock (Eq, Show, Enum)
   deriving anyclass (Exception)
+
+withCheckCurlCode :: IO CurlCode -> IO ()
+withCheckCurlCode m =
+  m >>= \case
+    CurlOK -> pure ()
+    rc -> throwM rc
 
 codeFromCInt :: CInt -> CurlCode
 codeFromCInt x = toEnum (fromIntegral x)

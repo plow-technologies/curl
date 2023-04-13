@@ -17,8 +17,9 @@
 -- with HTTP\/FTP\/etc servers.
 module Network.Curl.Easy where
 
+import Control.Exception (finally)
 import Control.Monad (foldM)
-import Control.Monad.Catch (MonadThrow (throwM))
+import Control.Monad.Catch (mask_)
 import Data.IORef (IORef)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64)
@@ -30,15 +31,28 @@ import Network.Curl.Opts
 import Network.Curl.Post
 import Network.Curl.Types
 
+-- | Should be used once to wrap all uses of libcurl.
+-- WARNING: the argument should not pure before it
+-- is completely done with curl (e.g., no forking or lazy returns)
+withCurlDo :: IO a -> IO a
+withCurlDo m = do
+  withCheckCurlCode $ curlGlobalInit 3 -- initialize everything
+  finally m curlGlobalCleanup
+
+runCurl :: (Curl -> IO a) -> IO a
+runCurl f = do
+  -- Initialize global libcurl instance
+  -- This can be done automatically using `curl_easy_init`, but
+  -- the curl docs recommend avoiding the implicit route
+  withCheckCurlCode $ curlGlobalInit 3
+  finally (f =<< initialize) curlGlobalCleanup
+
 -- | Initialise a curl instance
 initialize :: IO Curl
-initialize = mkCurl =<< easyInitialize
+initialize = mask_ . mkCurl =<< easyInitialize
 
 setopt :: Curl -> CurlOption -> IO ()
-setopt curl o =
-  doPrim >>= \case
-    CurlOK -> pure ()
-    rc -> throwM rc
+setopt curl o = mask_ $ withCheckCurlCode doPrim
   where
     doPrim :: IO CurlCode
     doPrim = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o

@@ -22,11 +22,13 @@ extra-source-files: CHANGELOG.md
 library
   exposed-modules:
     Curl
+    Curl.Internal.Info
     Curl.Internal
-    Curl.Easy
-    Curl.Info
+    Curl.Internal.Easy
+    Curl.Internal.Opts
+    Curl.Internal.Post
+    Curl.Internal.Types
     Curl.Opts
-    Curl.Post
     Curl.Types
 
   hs-source-dirs:     src

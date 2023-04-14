@@ -1,30 +1,26 @@
--- |
--- Module    : Curl
--- Copyright : (c) 2007-2009, Galois Inc
--- License   : BSD3
---
--- Maintainer: Sigbjorn Finne <sof@galois.com>
--- Stability : provisional
--- Portability: portable
---
--- A Haskell binding the libcurl library <http://curl.haxx.se/>, a
--- proven and feature-rich library for interacting with HTTP(S)\/FTP
--- servers.
---
--- The binding was initially made against version 7.16.2; libcurl does
--- appear to be considerate in not introducing breaking changes wrt
--- older versions. So, unless you're after the latest features (i.e.,
--- constructors towards the end the Option type), there's a very good
--- chance your code will work against older installations of libcurl.
-module Curl where
+module Curl
+  ( get,
+    get_,
+    head,
+    post,
+    post_,
+    multipart,
+    multipart_,
+    runWithResponse,
+    runWithResponseInfo,
+    module M,
+  )
+where
 
 import Control.Monad (void)
-import Curl.Easy
 import qualified Curl.Internal as Internal
-import Curl.Opts
-import Curl.Post (HttpPost)
-import Curl.Types
+import Curl.Internal.Easy
+import Curl.Internal.Opts
+import Curl.Internal.Types
+import Curl.Opts as M
+import Curl.Types as M hiding (CookieList, Filetime, Private) -- conflicts
 import Data.ByteString.Lazy (ByteString)
+import Prelude hiding (head)
 
 -- | Run a @GET@ request and collect the body as a lazy 'ByteString'
 get :: UrlString -> [CurlOption] -> IO (CurlCode, ByteString)
@@ -47,12 +43,12 @@ post_ :: UrlString -> [String] -> IO ()
 post_ url = void . runCurl . Internal.curlPost url
 
 -- | Run a multipart @POST@ request, returning the 'CurlCode'
-mulitpart :: UrlString -> [CurlOption] -> [HttpPost] -> IO CurlCode
-mulitpart url opts = runCurl . Internal.curlMultipart url opts
+multipart :: UrlString -> [CurlOption] -> [HttpPost] -> IO CurlCode
+multipart url opts = runCurl . Internal.curlMultipart url opts
 
 -- | Run a multipart @POST@ request, discarding the final 'CurlCode'
-mulitpart_ :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
-mulitpart_ url opts = void . runCurl . Internal.curlMultipart url opts
+multipart_ :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
+multipart_ url opts = void . runCurl . Internal.curlMultipart url opts
 
 -- | Run a custom curl request (as specified by the 'CurlOption's), returning
 -- the 'CurlReponse'

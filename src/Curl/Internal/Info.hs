@@ -1,29 +1,15 @@
---------------------------------------------------------------------
-
---------------------------------------------------------------------
-
--- |
--- Module    : Curl.Info
--- Copyright : (c) 2007-2009, Galois Inc
--- License   : BSD3
---
--- Maintainer: Sigbjorn Finne <sof@galois.com>
--- Stability : provisional
--- Portability: portable
---
--- Accessing the properties of a curl handle's current state\/request.
-module Curl.Info
+module Curl.Internal.Info
   ( getInfo,
   )
 where
 
 import Control.Monad.Catch (MonadThrow (throwM))
+import Curl.Internal.Types
 import Data.Word (Word32)
 import Foreign.C (CChar, CInt (CInt), CString, peekCString)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (peek, peekByteOff, sizeOf))
-import Curl.Types
 
 getInfo :: Curl -> Info -> IO InfoValue
 getInfo curl = \case

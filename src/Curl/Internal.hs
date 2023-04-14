@@ -2,11 +2,11 @@ module Curl.Internal where
 
 import Control.Monad (when, (>=>))
 import Control.Monad.Catch (MonadThrow (throwM))
-import Curl.Easy
-import Curl.Info
-import Curl.Opts
-import Curl.Post
-import Curl.Types
+import Curl.Internal.Easy
+import Curl.Internal.Info
+import Curl.Internal.Opts
+import Curl.Internal.Post
+import Curl.Internal.Types
 import Data.ByteString (packCStringLen)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as Lazy.ByteString

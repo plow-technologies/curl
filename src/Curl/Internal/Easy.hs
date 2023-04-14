@@ -1,28 +1,11 @@
---------------------------------------------------------------------
-
---------------------------------------------------------------------
-
--- |
--- Module    : Curl.Easy
--- Copyright : (c) Galois Inc 2007-2009
--- License   :
---
--- Maintainer: Sigbjorn Finne <sof@galois.com>
--- Stability : provisional
--- Portability: portable
---
--- Haskell binding to the libcurl <http://curl.haxx.se/> \"easy\" API.
--- The \"easy\" API provides a higher-level, easy-to-get-started calling
--- interface to the library's wide range of features for interacting
--- with HTTP\/FTP\/etc servers.
-module Curl.Easy where
+module Curl.Internal.Easy where
 
 import Control.Exception (finally)
 import Control.Monad (foldM, void)
 import Control.Monad.Catch (mask_)
-import Curl.Opts
-import Curl.Post
-import Curl.Types
+import Curl.Internal.Opts
+import Curl.Internal.Post
+import Curl.Internal.Types
 import Data.IORef (IORef)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64)

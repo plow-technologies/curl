@@ -1,22 +1,7 @@
---------------------------------------------------------------------
-
---------------------------------------------------------------------
-
--- |
--- Module    : Curl.Post
--- Copyright : (c) Galois Inc 2007-2009
--- License   : BSD3
---
--- Maintainer: Sigbjorn Finne <sof@galois.com>
--- Stability : provisional
--- Portability: portable
---
--- Representing and marshalling formdata (as part of POST uploads\/submissions.)
--- If you are only looking to submit a sequence of name=value pairs,
--- you are better off using the CurlPostFields constructor; much simpler.
-module Curl.Post where
+module Curl.Internal.Post where
 
 import Control.Monad (foldM, (<=<))
+import Curl.Internal.Types (Slist)
 import Data.Functor (($>))
 import Data.Word (Word32)
 import Foreign.C.String (CString, newCString)
@@ -24,7 +9,6 @@ import Foreign.C.Types (CChar)
 import Foreign.Marshal.Alloc (mallocBytes)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (pokeByteOff, sizeOf))
-import Curl.Types (Slist)
 
 type Header = String
 
@@ -44,9 +28,9 @@ data Content
   deriving stock (Eq, Show)
 
 multiformString :: String -> String -> HttpPost
-multiformString x y =
+multiformString postName y =
   HttpPost
-    { postName = x,
+    { postName,
       content = ContentString y,
       contentType = Nothing,
       extraHeaders = [],
@@ -63,7 +47,7 @@ marshallPosts = \case
   [] -> pure nullPtr
   ms ->
     traverse marshallPost ms >>= \case
-      [] -> undefined
+      [] -> pure nullPtr
       (x : xs) -> linkUp x xs $> x
   where
     linkUp :: Ptr a -> [Ptr a] -> IO ()

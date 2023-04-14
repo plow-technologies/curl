@@ -19,7 +19,6 @@ import Curl.Internal.Opts as O
   )
 import Curl.Internal.Post as O
   ( Content (..),
-    Header,
     HttpPost (..),
     multiformString,
   )

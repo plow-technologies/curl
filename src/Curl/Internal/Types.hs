@@ -3,7 +3,8 @@ module Curl.Internal.Types where
 import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Exception (Exception (displayException))
 import Control.Monad.Catch (MonadThrow (throwM))
-import Data.ByteString.Lazy (ByteString)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as Lazy.ByteString
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -15,6 +16,7 @@ import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
 import Foreign.Ptr (Ptr)
 import GHC.Generics (Generic)
+import Network.HTTP.Types (Header)
 
 -- | 'CurlResponse' is a record type encoding all the information
 -- embodied in a response to your Curl request. Currently only used
@@ -22,9 +24,9 @@ import GHC.Generics (Generic)
 data CurlResponse = CurlResponse
   { curlCode :: CurlCode,
     status :: Int,
-    statusLine :: String,
-    headers :: [(String, String)],
-    body :: ByteString,
+    statusLine :: ByteString,
+    headers :: [Header],
+    body :: Lazy.ByteString.ByteString,
     info :: Map Info InfoValue
   }
   deriving stock (Show, Generic)

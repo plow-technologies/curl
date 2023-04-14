@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternGuards #-}
+
 module Curl.Internal where
 
 import Control.Monad (when, (>=>))
@@ -7,16 +9,20 @@ import Curl.Internal.Info
 import Curl.Internal.Opts
 import Curl.Internal.Post
 import Curl.Internal.Types
-import Data.ByteString (packCStringLen)
-import Data.ByteString.Lazy (ByteString)
+import Data.Bifunctor (Bifunctor (bimap, first))
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.ByteString.Lazy as Lazy.ByteString
+import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.Foldable (foldl', traverse_)
 import Data.Functor ((<&>))
 import Data.IORef (IORef, modifyIORef, newIORef, readIORef)
 import Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import Data.Traversable (for)
-import Foreign.C (CInt, CStringLen, peekCStringLen)
+import Foreign.C (CInt, CStringLen)
+import Network.HTTP.Types (Header)
 
 runWithResponse :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
 runWithResponse url opts = runWithResponseInfo url opts mempty
@@ -39,7 +45,11 @@ curlGet url opts curl = do
   setopts curl opts
   perform curl
 
-curlGetString :: UrlString -> [CurlOption] -> Curl -> IO (CurlCode, ByteString)
+curlGetString ::
+  UrlString ->
+  [CurlOption] ->
+  Curl ->
+  IO (CurlCode, Lazy.ByteString.ByteString)
 curlGetString url opts curl = do
   (finalBody, gatherBody) <- newIncomingBuffer
   setDefaultSslOpts curl url
@@ -91,20 +101,21 @@ curlMultipart s os ps curl = do
   setopts curl os
   perform curl
 
-newIncomingHeader :: IO (IO (String, [(String, String)]), CStringLen -> IO ())
+newIncomingHeader :: IO (IO (ByteString, [Header]), CStringLen -> IO ())
 newIncomingHeader = do
   newIORef [] <&> \ref ->
-    (readFinalHeader ref, peekCStringLen >=> (modifyIORef ref . (:)))
+    (readFinalHeader ref, ByteString.packCStringLen >=> (modifyIORef ref . (:)))
   where
-    readFinalHeader :: IORef [String] -> IO (String, [(String, String)])
+    readFinalHeader ::
+      IORef [ByteString] -> IO (ByteString, [Header])
     readFinalHeader =
-      fmap (parseStatusNHeaders . foldl' (flip (<>)) []) . readIORef
+      fmap (parseStatusHeaders . foldl' (flip (<>)) mempty) . readIORef
 
-newIncomingBuffer :: IO (IO ByteString, CStringLen -> IO ())
+newIncomingBuffer :: IO (IO Lazy.ByteString.ByteString, CStringLen -> IO ())
 newIncomingBuffer =
   newIORef [] <&> \ref ->
     ( readIORef ref <&> (Lazy.ByteString.fromChunks . reverse),
-      packCStringLen >=> (modifyIORef ref . (:))
+      ByteString.packCStringLen >=> (modifyIORef ref . (:))
     )
 
 -- | Set a list of options on a Curl handle.
@@ -149,25 +160,34 @@ performWithResponse curl infos = do
 
 -- utils
 
-parseStatusNHeaders :: String -> (String, [(String, String)])
-parseStatusNHeaders ys = case intoLines [] ys of
-  a : as -> (a, map parseHeader as)
-  [] -> (mempty, [])
+parseStatusHeaders :: ByteString -> (ByteString, [Header])
+parseStatusHeaders bs = case rlines bs of
+  status : hs -> (status, mkHeaders hs)
+  _ -> (bs, mempty)
   where
-    intoLines :: String -> String -> [String]
-    intoLines acc = \case
-      "" -> addLine acc []
-      ('\r' : '\n' : xs) -> addLine acc $ intoLines mempty xs
-      (x : xs) -> intoLines (x : acc) xs
+    mkHeaders :: [ByteString] -> [Header]
+    mkHeaders =
+      fmap (first CaseInsensitive.mk . parseHeader)
+        . filter (not . ByteString.Char8.null)
+    -- Split the header string by carriage returns. The first element is the
+    -- status line, followed by the headers
+    rlines :: ByteString -> [ByteString]
+    rlines ps
+      | ByteString.Char8.null ps = mempty
+      | otherwise =
+          ByteString.Char8.strip <$> case ByteString.Char8.elemIndex '\r' ps of
+            Nothing -> [ps]
+            Just n ->
+              ByteString.Char8.take n ps
+                : rlines (ByteString.Char8.drop (n + 1) ps)
 
-    addLine :: String -> [String] -> [String]
-    addLine "" ls = ls
-    addLine l ls = reverse l : ls
-
-parseHeader :: String -> (String, String)
-parseHeader xs = case break (':' ==) xs of
-  (as, _ : bs) -> (as, bs)
-  (as, _) -> (as, mempty)
+    parseHeader :: ByteString -> (ByteString, ByteString)
+    parseHeader ps =
+      bimap ByteString.Char8.strip ByteString.Char8.strip $
+        case ByteString.Char8.break (':' ==) ps of
+          (x, y)
+            | Just (_, z) <- ByteString.Char8.uncons y -> (x, z)
+            | otherwise -> (x, mempty)
 
 -- | Imports data into the Haskell world and invokes the callback.
 callbackWriter :: (CStringLen -> IO ()) -> WriteFunction

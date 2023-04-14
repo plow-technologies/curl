@@ -22,9 +22,9 @@ extra-source-files: CHANGELOG.md
 library
   exposed-modules:
     Curl
-    Curl.Internal.Info
     Curl.Internal
     Curl.Internal.Easy
+    Curl.Internal.Info
     Curl.Internal.Opts
     Curl.Internal.Post
     Curl.Internal.Types
@@ -60,10 +60,12 @@ library
     -Wmissing-deriving-strategies
 
   build-depends:
-    , base        <5
-    , bytestring  >=0.9
+    , base              <5
+    , bytestring        >=0.9
+    , case-insensitive
     , containers
     , exceptions
+    , http-types
 
 source-repository head
   type:     git

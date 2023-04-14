@@ -2,15 +2,16 @@ module Curl.Internal.Post where
 
 import Control.Monad (foldM, (<=<))
 import Curl.Internal.Types (Slist)
-import Data.Functor (($>))
+import qualified Data.ByteString.Char8 as ByteString.Char8
+import qualified Data.CaseInsensitive as CaseInsensitive
+import Data.Functor (($>), (<&>))
 import Data.Word (Word32)
 import Foreign.C.String (CString, newCString)
 import Foreign.C.Types (CChar)
 import Foreign.Marshal.Alloc (mallocBytes)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (pokeByteOff, sizeOf))
-
-type Header = String
+import Network.HTTP.Types (Header)
 
 data HttpPost = HttpPost
   { postName :: String,
@@ -82,7 +83,7 @@ marshallPost HttpPost {..} = do
       pokeByteOff @Word32 php (ptrIndex 10) 0x4
   cs1 <- maybe (pure nullPtr) newCString contentType
   pokeByteOff php (ptrIndex 7) cs1
-  cs2 <- mapM newCString extraHeaders
+  cs2 <- traverse newCString strHeaders
   ip <- foldM slistAppend nullPtr cs2
   pokeByteOff php (ptrIndex 8) ip
   pokeByteOff php (ptrIndex 9) nullPtr
@@ -92,6 +93,12 @@ marshallPost HttpPost {..} = do
     showName
   pure php
   where
+    strHeaders :: [String]
+    strHeaders =
+      extraHeaders <&> \(k, v) ->
+        ByteString.Char8.unpack $
+          CaseInsensitive.original k <> ": " <> v
+
     ptrIndex :: Int -> Int
     ptrIndex n = n * sizeOf nullPtr
 

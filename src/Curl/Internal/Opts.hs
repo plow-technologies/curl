@@ -34,7 +34,7 @@ data CurlOption
   | -- | byte range to fetch
     Range String
   | -- | external pointer to pass to as 'WriteFunction's last argument.
-    InFile FilePath
+    WriteData FilePath
   | -- | buffer for curl to deposit error messages (must at least CURL_ERROR_SIZE bytes long). Uses standard error if not specified.
     ErrorBuffer (Ptr CChar)
   | -- | callback to handle incoming data.
@@ -485,7 +485,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   UserPwd x -> string (withObject 5) x
   ProxyUserPwd x -> string (withObject 6) x
   Range x -> string (withObject 7) x
-  InFile x -> string (withObject 9) x
+  WriteData x -> string (withObject 9) x
   ErrorBuffer x -> unmarshalCptr um (withObject 10) x
   WriteFun x -> writeFun (withFunc 11) x
   ReadFun x -> readFun (withFunc 12) x

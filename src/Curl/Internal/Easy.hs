@@ -1,6 +1,5 @@
 module Curl.Internal.Easy where
 
-import Control.Exception (finally)
 import Control.Monad (foldM, void)
 import Control.Monad.Catch (mask_)
 import Curl.Internal.Opts
@@ -15,12 +14,7 @@ import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, freeHaskellFunPtr, nullPtr)
 
 runCurl :: (Curl -> IO a) -> IO a
-runCurl f = do
-  -- Initialize global libcurl instance
-  -- This can be done automatically using `curl_easy_init`, but
-  -- the curl docs recommend avoiding the implicit route
-  void . withCheckCurlCode $ curlGlobalInit 3
-  finally (f =<< initialize) curlGlobalCleanup
+runCurl f = f =<< initialize
 
 -- | Initialise a curl instance
 initialize :: IO Curl

@@ -3,7 +3,7 @@
 --------------------------------------------------------------------
 
 -- |
--- Module    : Network.Curl.Easy
+-- Module    : Curl.Easy
 -- Copyright : (c) Galois Inc 2007-2009
 -- License   :
 --
@@ -15,7 +15,7 @@
 -- The \"easy\" API provides a higher-level, easy-to-get-started calling
 -- interface to the library's wide range of features for interacting
 -- with HTTP\/FTP\/etc servers.
-module Network.Curl.Easy where
+module Curl.Easy where
 
 import Control.Exception (finally)
 import Control.Monad (foldM)
@@ -27,9 +27,9 @@ import Foreign.C.String (CString, newCString, peekCString, withCString)
 import Foreign.C.Types (CChar, CInt (CInt))
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, freeHaskellFunPtr, nullPtr)
-import Network.Curl.Opts
-import Network.Curl.Post
-import Network.Curl.Types
+import Curl.Opts
+import Curl.Post
+import Curl.Types
 
 -- | Should be used once to wrap all uses of libcurl.
 -- WARNING: the argument should not pure before it

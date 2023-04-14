@@ -1,4 +1,4 @@
-module Network.Curl.Internal where
+module Curl.Internal where
 
 import Control.Monad (void, when, (>=>))
 import Control.Monad.Catch (MonadThrow (throwM))
@@ -12,11 +12,11 @@ import Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import Data.Traversable (for)
 import Foreign.C (CInt, CStringLen, peekCStringLen)
-import Network.Curl.Easy
-import Network.Curl.Info
-import Network.Curl.Opts
-import Network.Curl.Post
-import Network.Curl.Types
+import Curl.Easy
+import Curl.Info
+import Curl.Opts
+import Curl.Post
+import Curl.Types
 
 runWithResponse :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
 runWithResponse url opts = runWithResponseInfo url opts mempty

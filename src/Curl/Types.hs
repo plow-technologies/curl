@@ -1,5 +1,5 @@
 -- |
--- Module    : Network.Curl.Types
+-- Module    : Curl.Types
 -- Copyright : (c) Galois Inc 2007-2009
 -- License   : BSD3
 --
@@ -11,7 +11,7 @@
 -- @Curl@ handle type which holds the C library stateful connection
 -- handle along with a set of cleanup actions tht should be performed
 -- upon shutting down the curl session.
-module Network.Curl.Types
+module Curl.Types
   ( CurlHandle,
     CurlResponse (..),
     UrlString,

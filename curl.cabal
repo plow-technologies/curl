@@ -21,13 +21,13 @@ extra-source-files: CHANGELOG.md
 
 library
   exposed-modules:
-    Network.Curl
-    Network.Curl.Internal
-    Network.Curl.Easy
-    Network.Curl.Info
-    Network.Curl.Opts
-    Network.Curl.Post
-    Network.Curl.Types
+    Curl
+    Curl.Internal
+    Curl.Easy
+    Curl.Info
+    Curl.Opts
+    Curl.Post
+    Curl.Types
 
   hs-source-dirs:     src
   include-dirs:       cbits

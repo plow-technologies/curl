@@ -1,5 +1,5 @@
 -- |
--- Module    : Network.Curl
+-- Module    : Curl
 -- Copyright : (c) 2007-2009, Galois Inc
 -- License   : BSD3
 --
@@ -16,14 +16,14 @@
 -- older versions. So, unless you're after the latest features (i.e.,
 -- constructors towards the end the Option type), there's a very good
 -- chance your code will work against older installations of libcurl.
-module Network.Curl where
+module Curl where
 
 import Data.ByteString.Lazy (ByteString)
-import Network.Curl.Easy
-import qualified Network.Curl.Internal as Internal
-import Network.Curl.Opts
-import Network.Curl.Post (HttpPost)
-import Network.Curl.Types
+import Curl.Easy
+import qualified Curl.Internal as Internal
+import Curl.Opts
+import Curl.Post (HttpPost)
+import Curl.Types
 
 -- | Performs a basic GET request, dumping the output on stdout
 get :: UrlString -> [CurlOption] -> IO ()

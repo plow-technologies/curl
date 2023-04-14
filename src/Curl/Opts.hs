@@ -1,5 +1,5 @@
 -- |
--- Module    : Network.Curl.Opts
+-- Module    : Curl.Opts
 -- Copyright : (c) Galois Inc 2007-2009
 -- License   : BSD3
 --
@@ -9,7 +9,7 @@
 --
 -- This module contains the various options that specify what happens
 -- when we use @perform@ on a @Curl@ handle.
-module Network.Curl.Opts where
+module Curl.Opts where
 
 import Data.Bits (Bits (complement, (.|.)))
 import Data.List (intercalate)
@@ -17,8 +17,8 @@ import Data.Word (Word32, Word64)
 import Foreign.C.Types (CChar, CInt)
 import Foreign.Ptr (Ptr, castPtr)
 import GHC.Generics (Generic)
-import Network.Curl.Post (HttpPost)
-import Network.Curl.Types (Curl, CurlHandle, Port, UrlString)
+import Curl.Post (HttpPost)
+import Curl.Types (Curl, CurlHandle, Port, UrlString)
 
 pattern GET :: [CurlOption]
 pattern GET = [Post False, NoBody False]

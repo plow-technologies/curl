@@ -3,7 +3,7 @@
 --------------------------------------------------------------------
 
 -- |
--- Module    : Network.Curl.Info
+-- Module    : Curl.Info
 -- Copyright : (c) 2007-2009, Galois Inc
 -- License   : BSD3
 --
@@ -12,7 +12,7 @@
 -- Portability: portable
 --
 -- Accessing the properties of a curl handle's current state\/request.
-module Network.Curl.Info
+module Curl.Info
   ( getInfo,
   )
 where
@@ -23,7 +23,7 @@ import Foreign.C (CChar, CInt (CInt), CString, peekCString)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (peek, peekByteOff, sizeOf))
-import Network.Curl.Types
+import Curl.Types
 
 getInfo :: Curl -> Info -> IO InfoValue
 getInfo curl = \case

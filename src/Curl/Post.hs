@@ -3,7 +3,7 @@
 --------------------------------------------------------------------
 
 -- |
--- Module    : Network.Curl.Post
+-- Module    : Curl.Post
 -- Copyright : (c) Galois Inc 2007-2009
 -- License   : BSD3
 --
@@ -14,7 +14,7 @@
 -- Representing and marshalling formdata (as part of POST uploads\/submissions.)
 -- If you are only looking to submit a sequence of name=value pairs,
 -- you are better off using the CurlPostFields constructor; much simpler.
-module Network.Curl.Post where
+module Curl.Post where
 
 import Control.Monad (foldM, (<=<))
 import Data.Functor (($>))
@@ -24,7 +24,7 @@ import Foreign.C.Types (CChar)
 import Foreign.Marshal.Alloc (mallocBytes)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (pokeByteOff, sizeOf))
-import Network.Curl.Types (Slist)
+import Curl.Types (Slist)
 
 type Header = String
 

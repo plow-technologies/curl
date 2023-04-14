@@ -1,7 +1,12 @@
 module Curl.Internal where
 
-import Control.Monad (void, when, (>=>))
+import Control.Monad (when, (>=>))
 import Control.Monad.Catch (MonadThrow (throwM))
+import Curl.Easy
+import Curl.Info
+import Curl.Opts
+import Curl.Post
+import Curl.Types
 import Data.ByteString (packCStringLen)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as Lazy.ByteString
@@ -12,11 +17,6 @@ import Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import Data.Traversable (for)
 import Foreign.C (CInt, CStringLen, peekCStringLen)
-import Curl.Easy
-import Curl.Info
-import Curl.Opts
-import Curl.Post
-import Curl.Types
 
 runWithResponse :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
 runWithResponse url opts = runWithResponseInfo url opts mempty
@@ -31,13 +31,13 @@ runWithResponseInfo url opts infos curl = do
 
 -- | 'curlGet' perform a basic GET, dumping the output on stdout.
 -- The list of options are set prior performing the GET request.
-curlGet :: UrlString -> [CurlOption] -> Curl -> IO ()
+curlGet :: UrlString -> [CurlOption] -> Curl -> IO CurlCode
 curlGet url opts curl = do
   setopts curl [FailOnError True, Url url]
   -- Note: later options may (and should, probably) override these defaults.
   setDefaultSslOpts curl url
   setopts curl opts
-  void $ perform curl
+  perform curl
 
 curlGetString :: UrlString -> [CurlOption] -> Curl -> IO (CurlCode, ByteString)
 curlGetString url opts curl = do
@@ -53,8 +53,8 @@ curlGetString url opts curl = do
   (,) <$> perform curl <*> finalBody
 
 -- | Get the headers associated with a particular URL.
--- Returns the status line and the key-value pairs for the headers.
-curlHead :: UrlString -> [CurlOption] -> Curl -> IO (String, [(String, String)])
+-- Returns 'CurlResponse' with relevant information
+curlHead :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
 curlHead url opts curl = do
   (finalHeader, gatherHeader) <- newIncomingHeader
   setopts
@@ -64,22 +64,32 @@ curlHead url opts curl = do
       HeadFun $ callbackWriter gatherHeader
     ]
   setopts curl opts
-  void $ perform curl
-  finalHeader
+  curlCode <- perform curl
+  status <- getResponseCode curl
+  (statusLine, headers) <- finalHeader
+  pure
+    CurlResponse
+      { curlCode,
+        status,
+        headers,
+        statusLine,
+        body = mempty,
+        info = Map.empty
+      }
 
 -- | 'curlPost' performs. a common POST operation, namely that
 -- of submitting a sequence of name=value pairs.
-curlPost :: UrlString -> [String] -> Curl -> IO ()
+curlPost :: UrlString -> [String] -> Curl -> IO CurlCode
 curlPost s ps curl = do
   setopts curl [Verbose True, PostFields ps, CookieJar "cookies", Url s]
-  void $ perform curl
+  perform curl
 
 -- | 'curlMultiPost' perform a multi-part POST submission.
-curlMultipart :: UrlString -> [CurlOption] -> [HttpPost] -> Curl -> IO ()
+curlMultipart :: UrlString -> [CurlOption] -> [HttpPost] -> Curl -> IO CurlCode
 curlMultipart s os ps curl = do
   setopts curl [Verbose True, Url s, Multipart ps]
   setopts curl os
-  void $ perform curl
+  perform curl
 
 newIncomingHeader :: IO (IO (String, [(String, String)]), CStringLen -> IO ())
 newIncomingHeader = do

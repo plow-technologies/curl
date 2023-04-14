@@ -18,8 +18,11 @@
 module Curl.Easy where
 
 import Control.Exception (finally)
-import Control.Monad (foldM)
+import Control.Monad (foldM, void)
 import Control.Monad.Catch (mask_)
+import Curl.Opts
+import Curl.Post
+import Curl.Types
 import Data.IORef (IORef)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64)
@@ -27,32 +30,29 @@ import Foreign.C.String (CString, newCString, peekCString, withCString)
 import Foreign.C.Types (CChar, CInt (CInt))
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, freeHaskellFunPtr, nullPtr)
-import Curl.Opts
-import Curl.Post
-import Curl.Types
-
--- | Should be used once to wrap all uses of libcurl.
--- WARNING: the argument should not pure before it
--- is completely done with curl (e.g., no forking or lazy returns)
-withCurlDo :: IO a -> IO a
-withCurlDo m = do
-  withCheckCurlCode $ curlGlobalInit 3 -- initialize everything
-  finally m curlGlobalCleanup
 
 runCurl :: (Curl -> IO a) -> IO a
 runCurl f = do
   -- Initialize global libcurl instance
   -- This can be done automatically using `curl_easy_init`, but
   -- the curl docs recommend avoiding the implicit route
-  withCheckCurlCode $ curlGlobalInit 3
+  void . withCheckCurlCode $ curlGlobalInit 3
   finally (f =<< initialize) curlGlobalCleanup
 
 -- | Initialise a curl instance
 initialize :: IO Curl
 initialize = mask_ . mkCurl =<< easyInitialize
 
+-- | Run a curl operation, checking the `CurlCode`
+perform :: Curl -> IO CurlCode
+perform curl =
+  withCheckCurlCode
+    . fmap codeFromCInt
+    . curlPrim curl
+    $ const easyPerformPrim
+
 setopt :: Curl -> CurlOption -> IO ()
-setopt curl o = mask_ $ withCheckCurlCode doPrim
+setopt curl o = mask_ . void $ withCheckCurlCode doPrim
   where
     doPrim :: IO CurlCode
     doPrim = curlPrim curl $ \r h -> unmarshallOption (easyUm r h) o
@@ -131,9 +131,6 @@ setopt curl o = mask_ $ withCheckCurlCode doPrim
     debugToPrim :: DebugFunction -> DebugFunctionPrim
     debugToPrim (DebugFunction f) _ b c d e =
       0 <$ f curl (toEnum (fromIntegral b)) c d e
-
-perform :: Curl -> IO CurlCode
-perform curl = codeFromCInt <$> curlPrim curl (const easyPerformPrim)
 
 curlGlobalInit :: CInt -> IO CurlCode
 curlGlobalInit v = codeFromCInt <$> curlGlobalInitPrim v

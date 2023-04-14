@@ -179,10 +179,10 @@ data CurlCode
   deriving stock (Eq, Show, Enum)
   deriving anyclass (Exception)
 
-withCheckCurlCode :: IO CurlCode -> IO ()
+withCheckCurlCode :: IO CurlCode -> IO CurlCode
 withCheckCurlCode m =
   m >>= \case
-    CurlOK -> pure ()
+    rc@CurlOK -> pure rc
     rc -> throwM rc
 
 codeFromCInt :: CInt -> CurlCode

@@ -18,31 +18,49 @@
 -- chance your code will work against older installations of libcurl.
 module Curl where
 
-import Data.ByteString.Lazy (ByteString)
+import Control.Monad (void)
 import Curl.Easy
 import qualified Curl.Internal as Internal
 import Curl.Opts
 import Curl.Post (HttpPost)
 import Curl.Types
+import Data.ByteString.Lazy (ByteString)
 
--- | Performs a basic GET request, dumping the output on stdout
-get :: UrlString -> [CurlOption] -> IO ()
-get url = runCurl . Internal.curlGet url
+-- | Run a @GET@ request and collect the body as a lazy 'ByteString'
+get :: UrlString -> [CurlOption] -> IO (CurlCode, ByteString)
+get url = runCurl . Internal.curlGetString url
 
-getString :: UrlString -> [CurlOption] -> IO (CurlCode, ByteString)
-getString url = runCurl . Internal.curlGetString url
+-- | Run a @GET@ request, dumping the output on stdout
+get_ :: UrlString -> [CurlOption] -> IO CurlCode
+get_ url = runCurl . Internal.curlGet url
 
-head :: UrlString -> [CurlOption] -> IO (String, [(String, String)])
+-- | Run a @HEAD@ request, gathering response info into a 'CurlResponse'
+head :: UrlString -> [CurlOption] -> IO CurlResponse
 head url = runCurl . Internal.curlHead url
 
-post :: UrlString -> [String] -> IO ()
+-- | Run a @POST@ request, returning the 'CurlCode'
+post :: UrlString -> [String] -> IO CurlCode
 post url = runCurl . Internal.curlPost url
 
-mulitpart :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
+-- | Run a @POST@ request, discarding the final 'CurlCode'
+post_ :: UrlString -> [String] -> IO ()
+post_ url = void . runCurl . Internal.curlPost url
+
+-- | Run a multipart @POST@ request, returning the 'CurlCode'
+mulitpart :: UrlString -> [CurlOption] -> [HttpPost] -> IO CurlCode
 mulitpart url opts = runCurl . Internal.curlMultipart url opts
 
+-- | Run a multipart @POST@ request, discarding the final 'CurlCode'
+mulitpart_ :: UrlString -> [CurlOption] -> [HttpPost] -> IO ()
+mulitpart_ url opts = void . runCurl . Internal.curlMultipart url opts
+
+-- | Run a custom curl request (as specified by the 'CurlOption's), returning
+-- the 'CurlReponse'
 runWithResponse :: UrlString -> [CurlOption] -> IO CurlResponse
 runWithResponse url = runCurl . Internal.runWithResponse url
 
+-- | Run a custom curl request (as specified by the 'CurlOption's), returning
+-- the 'CurlReponse'. Also includes the 'InfoValue's taken from the provided
+-- 'Info's
 runWithResponseInfo :: UrlString -> [CurlOption] -> [Info] -> IO CurlResponse
 runWithResponseInfo url opts = runCurl . Internal.runWithResponseInfo url opts

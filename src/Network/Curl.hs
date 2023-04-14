@@ -22,8 +22,8 @@ import Data.ByteString.Lazy (ByteString)
 import Network.Curl.Easy
 import qualified Network.Curl.Internal as Internal
 import Network.Curl.Opts
-import Network.Curl.Types
 import Network.Curl.Post (HttpPost)
+import Network.Curl.Types
 
 -- | Performs a basic GET request, dumping the output on stdout
 get :: UrlString -> [CurlOption] -> IO ()
@@ -43,3 +43,6 @@ mulitpart url opts = runCurl . Internal.curlMultipart url opts
 
 runWithResponse :: UrlString -> [CurlOption] -> IO CurlResponse
 runWithResponse url = runCurl . Internal.runWithResponse url
+
+runWithResponseInfo :: UrlString -> [CurlOption] -> [Info] -> IO CurlResponse
+runWithResponseInfo url opts = runCurl . Internal.runWithResponseInfo url opts

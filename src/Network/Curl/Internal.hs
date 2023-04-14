@@ -9,6 +9,8 @@ import Data.Foldable (foldl', traverse_)
 import Data.Functor ((<&>))
 import Data.IORef (IORef, modifyIORef, newIORef, readIORef)
 import Data.List (isPrefixOf)
+import qualified Data.Map as Map
+import Data.Traversable (for)
 import Foreign.C (CInt, CStringLen, peekCStringLen)
 import Network.Curl.Easy
 import Network.Curl.Info
@@ -17,11 +19,15 @@ import Network.Curl.Post
 import Network.Curl.Types
 
 runWithResponse :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
-runWithResponse url opts curl = do
+runWithResponse url opts = runWithResponseInfo url opts mempty
+
+runWithResponseInfo ::
+  UrlString -> [CurlOption] -> [Info] -> Curl -> IO CurlResponse
+runWithResponseInfo url opts infos curl = do
   setDefaultSslOpts curl url
   setopts curl opts
   setopt curl $ Url url
-  performWithResponse curl
+  performWithResponse curl infos
 
 -- | 'curlGet' perform a basic GET, dumping the output on stdout.
 -- The list of options are set prior performing the GET request.
@@ -98,16 +104,14 @@ setopts curl = traverse_ $ setopt curl
 setDefaultSslOpts :: Curl -> UrlString -> IO ()
 setDefaultSslOpts curl url =
   when ("https:" `isPrefixOf` url) $
-    -- the default options are pretty dire, really -- turning off
-    -- the peer verification checks!
-    setopts curl [SslVerifyPeer False, SslVerifyHost 0]
+    setopts curl [SslVerifyPeer True, SslVerifyHost 1]
 
 -- | Perform the actions already specified on the handle.
 -- Collects useful information about the returned message.
 -- Note that this function sets the
 -- 'WriteFun' and 'HeadFun' options
-performWithResponse :: Curl -> IO CurlResponse
-performWithResponse curl = do
+performWithResponse :: Curl -> [Info] -> IO CurlResponse
+performWithResponse curl infos = do
   (finalHeader, gatherHeader) <- newIncomingHeader
   (finalBody, gatherBody) <- newIncomingBuffer
   -- Instead of allocating a separate handler for each
@@ -122,6 +126,7 @@ performWithResponse curl = do
   status <- getResponseCode curl
   (statusLine, headers) <- finalHeader
   body <- finalBody
+  info <- fmap Map.fromList . for infos $ \i -> (i,) <$> getInfo curl i
   pure
     CurlResponse
       { curlCode,
@@ -129,9 +134,7 @@ performWithResponse curl = do
         headers,
         statusLine,
         body,
-        -- note: we're holding onto the handle here..
-        -- note: with this interface this is not neccessary.
-        info = getInfo curl
+        info
       }
 
 -- utils

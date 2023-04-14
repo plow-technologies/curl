@@ -40,6 +40,7 @@ import Data.ByteString.Lazy (ByteString)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import Foreign.C (CInt)
@@ -57,9 +58,9 @@ data CurlResponse = CurlResponse
     statusLine :: String,
     headers :: [(String, String)],
     body :: ByteString,
-    info :: Info -> IO InfoValue
+    info :: Map Info InfoValue
   }
-  deriving stock (Generic)
+  deriving stock (Show, Generic)
 
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.

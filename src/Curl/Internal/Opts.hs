@@ -1,13 +1,17 @@
 module Curl.Internal.Opts where
 
+import Curl.Internal.Post (HttpPost)
+import Curl.Internal.Types (Curl, CurlHandle, Port, UrlString)
 import Data.Bits (Bits (complement, (.|.)))
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as ByteString.Char8
 import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64)
 import Foreign.C.Types (CChar, CInt)
 import Foreign.Ptr (Ptr, castPtr)
 import GHC.Generics (Generic)
-import Curl.Internal.Post (HttpPost)
-import Curl.Internal.Types (Curl, CurlHandle, Port, UrlString)
+import Network.HTTP.Types (ByteRange, renderByteRanges)
 
 pattern GET :: [CurlOption]
 pattern GET = [Post False, NoBody False]
@@ -32,8 +36,9 @@ data CurlOption
   | -- | same thing, but for the proxy.
     ProxyUserPwd String
   | -- | byte range to fetch
-    Range String
+    Range [ByteRange]
   | -- | external pointer to pass to as 'WriteFunction's last argument.
+    -- FIXME This needs to be a pointer to a file
     WriteData FilePath
   | -- | buffer for curl to deposit error messages (must at least CURL_ERROR_SIZE bytes long). Uses standard error if not specified.
     ErrorBuffer (Ptr CChar)
@@ -484,7 +489,18 @@ unmarshallOption um@Unmarshaller {..} = \case
   Proxy x -> string (withObject 4) x
   UserPwd x -> string (withObject 5) x
   ProxyUserPwd x -> string (withObject 6) x
-  Range x -> string (withObject 7) x
+  Range x ->
+    string (withObject 7)
+      . ByteString.Char8.unpack
+      . fromMaybe byteRanges
+      -- `renderByteRanges` will add the `bytes=` prefix, but this won't be
+      -- accepted by libcurl. It's still nicer to use the `ByteRanges` type
+      -- and just strip the suffix
+      . ByteString.Char8.stripPrefix "bytes="
+      $ byteRanges
+    where
+      byteRanges :: ByteString
+      byteRanges = renderByteRanges x
   WriteData x -> string (withObject 9) x
   ErrorBuffer x -> unmarshalCptr um (withObject 10) x
   WriteFun x -> writeFun (withFunc 11) x

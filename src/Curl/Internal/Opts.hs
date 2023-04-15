@@ -23,8 +23,10 @@ pattern HEAD :: [CurlOption]
 pattern HEAD = [Post False, NoBody True]
 
 data CurlOption
-  = -- | external pointer to pass to as 'WriteFunction's last argument.
-    FileObj (Ptr ())
+  = -- | External pointer to pass to as 'WriteFunction's last argument.
+    -- If you don't pass a 'WriteFunction', libcurl will use the file pointer
+    -- itself to write the data internally
+    WriteData (Ptr ())
   | -- | the URL to use for next request; can be the full URL or just the authority\/hostname.
     Url UrlString
   | -- | what port to use.
@@ -37,9 +39,9 @@ data CurlOption
     ProxyUserPwd String
   | -- | byte range to fetch
     Range [ByteRange]
-  | -- | external pointer to pass to as 'WriteFunction's last argument.
+  | -- | external pointer to pass to as 'ReadFunction's last argument.
     -- FIXME This needs to be a pointer to a file
-    WriteData FilePath
+    ReadData (Ptr ())
   | -- | buffer for curl to deposit error messages (must at least CURL_ERROR_SIZE bytes long). Uses standard error if not specified.
     ErrorBuffer (Ptr CChar)
   | -- | callback to handle incoming data.
@@ -483,7 +485,7 @@ baseOffT = 30000
 
 unmarshallOption :: Unmarshaller a -> CurlOption -> IO a
 unmarshallOption um@Unmarshaller {..} = \case
-  FileObj x -> pointer (withObject 1) x
+  WriteData x -> pointer (withObject 1) x
   Url x -> string (withObject 2) x
   Port x -> long (withLong 3) x
   Proxy x -> string (withObject 4) x
@@ -501,7 +503,7 @@ unmarshallOption um@Unmarshaller {..} = \case
     where
       byteRanges :: ByteString
       byteRanges = renderByteRanges x
-  WriteData x -> string (withObject 9) x
+  ReadData x -> pointer (withObject 9) x
   ErrorBuffer x -> unmarshalCptr um (withObject 10) x
   WriteFun x -> writeFun (withFunc 11) x
   ReadFun x -> readFun (withFunc 12) x

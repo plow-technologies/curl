@@ -48,7 +48,7 @@ getInfoStr :: Curl -> Word32 -> IO InfoValue
 getInfoStr curl tg =
   alloca $ \ptr ->
     act ptr >>= \case
-      CurlExitSuccess ->
+      CExitSuccess ->
         peek ptr >>= \case
           s
             | s == nullPtr -> pure $ String mempty
@@ -62,7 +62,7 @@ getInfoLong :: Curl -> Word32 -> IO InfoValue
 getInfoLong curl tg =
   alloca $ \ptr ->
     act ptr >>= \case
-      CurlExitSuccess -> Long <$> peek ptr
+      CExitSuccess -> Long <$> peek ptr
       rc -> throwM $ codeFromCInt rc
   where
     act :: Ptr Word32 -> IO CInt
@@ -72,7 +72,7 @@ getInfoDouble :: Curl -> Word32 -> IO InfoValue
 getInfoDouble curl tg =
   alloca $ \ptr ->
     act ptr >>= \case
-      CurlExitSuccess -> Double <$> peek ptr
+      CExitSuccess -> Double <$> peek ptr
       rc -> throwM $ codeFromCInt rc
   where
     act :: Ptr Double -> IO CInt
@@ -82,7 +82,7 @@ getInfoSList :: Curl -> Word32 -> IO InfoValue
 getInfoSList curl tg =
   alloca $ \ptr ->
     act ptr >>= \case
-      CurlExitSuccess -> fmap List . unmarshallList =<< peek ptr
+      CExitSuccess -> fmap List . unmarshallList =<< peek ptr
       rc -> throwM $ codeFromCInt rc
   where
     act :: Ptr (Ptr (Ptr CChar)) -> IO CInt

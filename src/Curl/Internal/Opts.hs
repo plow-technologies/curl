@@ -1,17 +1,77 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module Curl.Internal.Opts where
 
+import Control.Monad (unless)
+import Control.Monad.Catch (MonadThrow (throwM))
 import Curl.Internal.Post (HttpPost)
-import Curl.Internal.Types (Curl, CurlHandle, Port, UrlString)
+import Curl.Internal.Types
+  ( Curl,
+    CurlHandle,
+    CurlOtherError (CouldntOpenFile, FlushErrno),
+    Port,
+    UrlString,
+    pattern CExitSuccess,
+  )
 import Data.Bits (Bits (complement, (.|.)))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64)
-import Foreign.C.Types (CChar, CInt)
-import Foreign.Ptr (Ptr, castPtr)
+import Foreign.C (CChar, CInt (CInt), CString, withCString)
+import Foreign.Ptr (Ptr, castPtr, nullPtr)
 import GHC.Generics (Generic)
 import Network.HTTP.Types (ByteRange, renderByteRanges)
+
+-- | Represents C @FILE@ object for use with FFI
+data File
+
+-- | How to open a file, for C @fopen@
+data FileOpenMode
+  = OpenRead (Maybe TranslationMode)
+  | OpenWrite (Maybe TranslationMode)
+  | OpenAppend (Maybe TranslationMode)
+  deriving stock (Show, Eq, Generic)
+
+renderFileOpenMode :: FileOpenMode -> String
+renderFileOpenMode = \case
+  OpenRead t -> "r" <> renderTranslation t
+  OpenWrite t -> "w" <> renderTranslation t
+  OpenAppend t -> "a" <> renderTranslation t
+  where
+    renderTranslation :: Maybe TranslationMode -> String
+    renderTranslation =
+      -- Will implicitly be `TextMode`
+      maybe mempty $ \case
+        TextMode -> "t"
+        BinaryMode -> "b"
+
+{- HLINT ignore openFile "Use >=>" -}
+
+-- | Open a file in the specified mode, getting a @Ptr File@. This can be used
+-- with libcurl\'s 'WriteData' or 'ReadData' arguments
+openFile :: FilePath -> FileOpenMode -> IO (Ptr File)
+openFile path (renderFileOpenMode -> mode) =
+  withCString path $ \cpath -> withCString mode $ \cmode ->
+    fopen cpath cmode >>= \case
+      ptr
+        | ptr == nullPtr -> throwM $ CouldntOpenFile path
+        | otherwise -> pure ptr
+
+-- | Close the file associated with the @Ptr File@ (equivalent to @FILE *@). Also
+-- calls @fflush@. Throws 'FlushErrno' if @fflush@ fails with a non-zero exit
+-- code (only after closing the file, however)
+closeFile :: Ptr File -> IO ()
+closeFile ptr = do
+  fflush ptr >>= \x -> do
+    fclose ptr
+    unless (x == CExitSuccess) . throwM . FlushErrno $ fromIntegral x
+
+data TranslationMode
+  = TextMode
+  | BinaryMode
+  deriving stock (Show, Eq, Generic)
 
 pattern GET :: [CurlOption]
 pattern GET = [Post False, NoBody False]
@@ -693,3 +753,9 @@ unmarshalEnum Unmarshaller {long} x = long x . fromIntegral . fromEnum
 
 unmarshalCptr :: Unmarshaller a -> Int -> Ptr CChar -> IO a
 unmarshalCptr Unmarshaller {pointer} x = pointer x . castPtr
+
+foreign import ccall "fopen" fopen :: CString -> CString -> IO (Ptr File)
+
+foreign import ccall "fclose" fclose :: Ptr File -> IO ()
+
+foreign import ccall "fflush" fflush :: Ptr File -> IO CInt

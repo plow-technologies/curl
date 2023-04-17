@@ -47,18 +47,22 @@ type Port = Word32
 
 data Slist
 
-pattern CurlExitSuccess :: CInt
-pattern CurlExitSuccess = 0
+pattern CExitSuccess :: CInt
+pattern CExitSuccess = 0
 
 data CurlOtherError
   = InvalidResponse String
   | UnexpectedResponse InfoValue
+  | CouldntOpenFile FilePath
+  | FlushErrno Int
   deriving stock (Show, Generic)
 
 instance Exception CurlOtherError where
   displayException = \case
     InvalidResponse s -> "Invalid response value: " <> s
     UnexpectedResponse iv -> "Unexpected response value " <> show iv
+    CouldntOpenFile fp -> "File couldn't be opened: " <> fp
+    FlushErrno i -> "fflush failed with " <> show i
 
 data CurlCode
   = CurlOK

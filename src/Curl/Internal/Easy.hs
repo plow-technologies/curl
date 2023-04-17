@@ -22,11 +22,7 @@ initialize = mask_ . mkCurl =<< easyInitialize
 
 -- | Run a curl operation, checking the `CurlCode`
 perform :: Curl -> IO CurlCode
-perform curl =
-  withCheckCurlCode
-    . fmap codeFromCInt
-    . curlPrim curl
-    $ const easyPerformPrim
+perform curl = fmap codeFromCInt . curlPrim curl $ const easyPerformPrim
 
 setopt :: Curl -> CurlOption -> IO ()
 setopt curl o = mask_ . void $ withCheckCurlCode doPrim

@@ -9,6 +9,7 @@ module Curl
     runWithResponse,
     runWithResponseInfo,
     withFilePtr,
+    withCheckCurlCode,
     module M,
   )
 where

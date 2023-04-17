@@ -152,6 +152,7 @@ data CurlCode
   deriving stock (Eq, Show, Enum)
   deriving anyclass (Exception)
 
+-- | Causes any non-'CurlOK' 'CurlCode' to be thrown as an exception
 withCheckCurlCode :: IO CurlCode -> IO CurlCode
 withCheckCurlCode m =
   m >>= \case

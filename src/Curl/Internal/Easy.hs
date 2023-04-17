@@ -20,7 +20,7 @@ runCurl f = f =<< initialize
 initialize :: IO Curl
 initialize = mask_ . mkCurl =<< easyInitialize
 
--- | Run a curl operation, checking the `CurlCode`
+-- | Run a curl operation
 perform :: Curl -> IO CurlCode
 perform curl = fmap codeFromCInt . curlPrim curl $ const easyPerformPrim
 

@@ -4,6 +4,7 @@ module Curl.Internal.Opts where
 
 import Control.Monad (unless)
 import Control.Monad.Catch (MonadThrow (throwM))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Curl.Internal.Post (HttpPost)
 import Curl.Internal.Types
   ( Curl,
@@ -51,9 +52,9 @@ renderFileOpenMode = \case
 
 -- | Open a file in the specified mode, getting a @Ptr File@. This can be used
 -- with libcurl\'s 'WriteData' or 'ReadData' arguments
-openFile :: FilePath -> FileOpenMode -> IO (Ptr File)
-openFile path (renderFileOpenMode -> mode) =
-  withCString path $ \cpath -> withCString mode $ \cmode ->
+openFile :: MonadIO m => FileOpenMode -> FilePath -> m (Ptr File)
+openFile (renderFileOpenMode -> mode) path =
+  liftIO . withCString path $ \cpath -> withCString mode $ \cmode ->
     fopen cpath cmode >>= \case
       ptr
         | ptr == nullPtr -> throwM $ CouldntOpenFile path
@@ -62,8 +63,8 @@ openFile path (renderFileOpenMode -> mode) =
 -- | Close the file associated with the @Ptr File@ (equivalent to @FILE *@). Also
 -- calls @fflush@. Throws 'FlushErrno' if @fflush@ fails with a non-zero exit
 -- code (only after closing the file, however)
-closeFile :: Ptr File -> IO ()
-closeFile ptr = do
+closeFile :: MonadIO m => Ptr File -> m ()
+closeFile ptr = liftIO $ do
   fflush ptr >>= \x -> do
     fclose ptr
     unless (x == CExitSuccess) . throwM . FlushErrno $ fromIntegral x

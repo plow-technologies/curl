@@ -8,11 +8,13 @@ module Curl
     multipart_,
     runWithResponse,
     runWithResponseInfo,
+    withFilePtr,
     module M,
   )
 where
 
 import Control.Monad (void)
+import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Curl.Internal as M (callbackWriter, ignoreOutput)
 import qualified Curl.Internal as Internal
@@ -22,9 +24,11 @@ import Curl.Internal.Types
 import Curl.Opts as M
 import Curl.Types as M hiding (CookieList, Filetime, Private)
 import Data.ByteString.Lazy (ByteString)
+import Foreign.Ptr (Ptr)
 import Prelude hiding (head)
 
 -- | Run a @GET@ request and collect the body as a lazy 'ByteString'
+-- NOTE: This sets the 'WriteFun' option!
 get :: MonadIO m => UrlString -> [CurlOption] -> m (CurlCode, ByteString)
 get url = liftIO . runCurl . Internal.curlGetString url
 
@@ -54,13 +58,26 @@ multipart_ url opts = liftIO . void . runCurl . Internal.curlMultipart url opts
 
 -- | Run a custom curl request (as specified by the 'CurlOption's), returning
 -- the 'CurlReponse'
+-- NOTE: This sets the 'WriteFun' and 'HeadFun' options!
 runWithResponse :: MonadIO m => UrlString -> [CurlOption] -> m CurlResponse
 runWithResponse url = liftIO . runCurl . Internal.runWithResponse url
 
 -- | Run a custom curl request (as specified by the 'CurlOption's), returning
 -- the 'CurlReponse'. Also includes the 'InfoValue's taken from the provided
 -- 'Info's
+-- NOTE: This sets the 'WriteFun' and 'HeadFun' options!
 runWithResponseInfo ::
   MonadIO m => UrlString -> [CurlOption] -> [Info] -> m CurlResponse
 runWithResponseInfo url opts =
   liftIO . runCurl . Internal.runWithResponseInfo url opts
+
+-- | Run an IO action that operates on a file pointer, performing the appropriate
+-- cleanup. This can be useful for options like 'WriteData', which expect a file
+-- pointer
+--
+-- >>> path = "./data"
+-- >>> mode = OpenAppend $ Just BinaryMode
+-- >>> withFilePtr mode path $ \ptr -> get_ "file:///path" [ WriteData ptr ]
+withFilePtr ::
+  (MonadIO m, MonadMask m) => FileOpenMode -> FilePath -> (Ptr File -> m a) -> m a
+withFilePtr mode path = bracket (openFile mode path) closeFile

@@ -30,37 +30,37 @@ import Prelude hiding (head)
 
 -- | Run a @GET@ request and collect the body as a lazy 'ByteString'
 -- NOTE: This sets the 'WriteFun' option!
-get :: MonadIO m => UrlString -> [CurlOption] -> m (CurlCode, ByteString)
+get :: MonadIO m => Url -> [CurlOption] -> m (CurlCode, ByteString)
 get url = liftIO . runCurl . Internal.curlGetString url
 
 -- | Run a @GET@ request, dumping the output on stdout
-get_ :: MonadIO m => UrlString -> [CurlOption] -> m CurlCode
+get_ :: MonadIO m => Url -> [CurlOption] -> m CurlCode
 get_ url = liftIO . runCurl . Internal.curlGet url
 
 -- | Run a @HEAD@ request, gathering response info into a 'CurlResponse'
-head :: MonadIO m => UrlString -> [CurlOption] -> m CurlResponse
+head :: MonadIO m => Url -> [CurlOption] -> m CurlResponse
 head url = liftIO . runCurl . Internal.curlHead url
 
 -- | Run a @POST@ request, returning the 'CurlCode'
-post :: MonadIO m => UrlString -> [String] -> m CurlCode
+post :: MonadIO m => Url -> [String] -> m CurlCode
 post url = liftIO . runCurl . Internal.curlPost url
 
 -- | Run a @POST@ request, discarding the final 'CurlCode'
-post_ :: MonadIO m => UrlString -> [String] -> m ()
+post_ :: MonadIO m => Url -> [String] -> m ()
 post_ url = liftIO . void . runCurl . Internal.curlPost url
 
 -- | Run a multipart @POST@ request, returning the 'CurlCode'
-multipart :: MonadIO m => UrlString -> [CurlOption] -> [HttpPost] -> m CurlCode
+multipart :: MonadIO m => Url -> [CurlOption] -> [HttpPost] -> m CurlCode
 multipart url opts = liftIO . runCurl . Internal.curlMultipart url opts
 
 -- | Run a multipart @POST@ request, discarding the final 'CurlCode'
-multipart_ :: MonadIO m => UrlString -> [CurlOption] -> [HttpPost] -> m ()
+multipart_ :: MonadIO m => Url -> [CurlOption] -> [HttpPost] -> m ()
 multipart_ url opts = liftIO . void . runCurl . Internal.curlMultipart url opts
 
 -- | Run a custom curl request (as specified by the 'CurlOption's), returning
 -- the 'CurlReponse'
 -- NOTE: This sets the 'WriteFun' and 'HeadFun' options!
-runWithResponse :: MonadIO m => UrlString -> [CurlOption] -> m CurlResponse
+runWithResponse :: MonadIO m => Url -> [CurlOption] -> m CurlResponse
 runWithResponse url = liftIO . runCurl . Internal.runWithResponse url
 
 -- | Run a custom curl request (as specified by the 'CurlOption's), returning
@@ -68,7 +68,7 @@ runWithResponse url = liftIO . runCurl . Internal.runWithResponse url
 -- 'Info's
 -- NOTE: This sets the 'WriteFun' and 'HeadFun' options!
 runWithResponseInfo ::
-  MonadIO m => UrlString -> [CurlOption] -> [Info] -> m CurlResponse
+  MonadIO m => Url -> [CurlOption] -> [Info] -> m CurlResponse
 runWithResponseInfo url opts =
   liftIO . runCurl . Internal.runWithResponseInfo url opts
 

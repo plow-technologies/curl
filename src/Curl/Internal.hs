@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternGuards #-}
 
 module Curl.Internal where
@@ -18,45 +19,48 @@ import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.Foldable (foldl', traverse_)
 import Data.Functor ((<&>))
 import Data.IORef (IORef, modifyIORef, newIORef, readIORef)
-import Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import Data.Traversable (for)
 import Foreign.C (CInt, CStringLen)
 import Network.HTTP.Types (Header)
+import qualified URI.ByteString
 
-runWithResponse :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
+runWithResponse :: Url -> [CurlOption] -> Curl -> IO CurlResponse
 runWithResponse url opts = runWithResponseInfo url opts mempty
 
 runWithResponseInfo ::
-  UrlString -> [CurlOption] -> [Info] -> Curl -> IO CurlResponse
+  Url -> [CurlOption] -> [Info] -> Curl -> IO CurlResponse
 runWithResponseInfo url opts infos curl = do
   setDefaultSslOpts curl url
+  setPort curl url
   setopts curl opts
-  setopt curl $ Url url
+  setopt curl $ UseUrl url
   performWithResponse curl infos
 
 -- | 'curlGet' perform a basic GET, dumping the output on stdout.
 -- The list of options are set prior performing the GET request.
-curlGet :: UrlString -> [CurlOption] -> Curl -> IO CurlCode
+curlGet :: Url -> [CurlOption] -> Curl -> IO CurlCode
 curlGet url opts curl = do
-  setopts curl [FailOnError True, Url url]
+  setopts curl [FailOnError True, UseUrl url]
   -- Note: later options may (and should, probably) override these defaults.
   setDefaultSslOpts curl url
+  setPort curl url
   setopts curl opts
   perform curl
 
 curlGetString ::
-  UrlString ->
+  Url ->
   [CurlOption] ->
   Curl ->
   IO (CurlCode, Lazy.ByteString.ByteString)
 curlGetString url opts curl = do
   (finalBody, gatherBody) <- newIncomingBuffer
   setDefaultSslOpts curl url
+  setPort curl url
   setopts
     curl
     [ FailOnError True,
-      Url url,
+      UseUrl url,
       WriteFun $ callbackWriter gatherBody
     ]
   setopts curl opts
@@ -64,12 +68,12 @@ curlGetString url opts curl = do
 
 -- | Get the headers associated with a particular URL.
 -- Returns 'CurlResponse' with relevant information
-curlHead :: UrlString -> [CurlOption] -> Curl -> IO CurlResponse
+curlHead :: Url -> [CurlOption] -> Curl -> IO CurlResponse
 curlHead url opts curl = do
   (finalHeader, gatherHeader) <- newIncomingHeader
   setopts
     curl
-    [ Url url,
+    [ UseUrl url,
       NoBody True,
       HeadFun $ callbackWriter gatherHeader
     ]
@@ -89,15 +93,15 @@ curlHead url opts curl = do
 
 -- | 'curlPost' performs. a common POST operation, namely that
 -- of submitting a sequence of name=value pairs.
-curlPost :: UrlString -> [String] -> Curl -> IO CurlCode
+curlPost :: Url -> [String] -> Curl -> IO CurlCode
 curlPost s ps curl = do
-  setopts curl [Verbose True, PostFields ps, CookieJar "cookies", Url s]
+  setopts curl [Verbose True, PostFields ps, CookieJar "cookies", UseUrl s]
   perform curl
 
 -- | 'curlMultiPost' perform a multi-part POST submission.
-curlMultipart :: UrlString -> [CurlOption] -> [HttpPost] -> Curl -> IO CurlCode
+curlMultipart :: Url -> [CurlOption] -> [HttpPost] -> Curl -> IO CurlCode
 curlMultipart s os ps curl = do
-  setopts curl [Verbose True, Url s, Multipart ps]
+  setopts curl [Verbose True, UseUrl s, Multipart ps]
   setopts curl os
   perform curl
 
@@ -122,10 +126,19 @@ newIncomingBuffer =
 setopts :: Curl -> [CurlOption] -> IO ()
 setopts curl = traverse_ $ setopt curl
 
-setDefaultSslOpts :: Curl -> UrlString -> IO ()
-setDefaultSslOpts curl url =
-  when ("https:" `isPrefixOf` url) $
-    setopts curl [SslVerifyPeer True, SslVerifyHost 1]
+setDefaultSslOpts :: Curl -> Url -> IO ()
+setDefaultSslOpts
+  curl
+  (Url (URI.ByteString.URI (URI.ByteString.Scheme scheme) _ _ _ _)) =
+    when (scheme == "https") $
+      setopts curl [SslVerifyPeer True, SslVerifyHost 1]
+
+setPort :: Curl -> Url -> IO ()
+setPort curl (Url url)
+  | URI.ByteString.URI _ (Just authority) _ _ _ <- url,
+    URI.ByteString.Authority _ _ (Just (URI.ByteString.Port port)) <- authority =
+      setopt curl . Port $ fromIntegral port
+  | otherwise = pure ()
 
 -- | Perform the actions already specified on the handle.
 -- Collects useful information about the returned message.

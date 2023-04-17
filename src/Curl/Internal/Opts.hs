@@ -6,14 +6,7 @@ import Control.Monad (unless)
 import Control.Monad.Catch (MonadThrow (throwM))
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Curl.Internal.Post (HttpPost)
-import Curl.Internal.Types
-  ( Curl,
-    CurlHandle,
-    CurlOtherError (CouldntOpenFile, FlushErrno),
-    Port,
-    UrlString,
-    pattern CExitSuccess,
-  )
+import Curl.Internal.Types hiding (CookieList, Filetime, Private)
 import Data.Bits (Bits (complement, (.|.)))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
@@ -24,6 +17,7 @@ import Foreign.C (CChar, CInt (CInt), CString, withCString)
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
 import GHC.Generics (Generic)
 import Network.HTTP.Types (ByteRange, renderByteRanges)
+import qualified URI.ByteString
 
 -- | Represents C @FILE@ object for use with FFI
 data File
@@ -94,7 +88,7 @@ data CurlOption
     -- 'castPtr' to get the @Ptr ()@
     WriteData (Ptr File)
   | -- | the URL to use for next request; can be the full URL or just the authority\/hostname.
-    Url UrlString
+    UseUrl Url
   | -- | what port to use.
     Port Word32
   | -- | name of proxy
@@ -552,7 +546,10 @@ baseOffT = 30000
 unmarshallOption :: Unmarshaller a -> CurlOption -> IO a
 unmarshallOption um@Unmarshaller {..} = \case
   WriteData x -> pointer (withObject 1) $ castPtr x
-  Url x -> string (withObject 2) x
+  UseUrl (Url x) ->
+    string (withObject 2)
+      . ByteString.Char8.unpack
+      $ URI.ByteString.serializeURIRef' x
   Port x -> long (withLong 3) x
   Proxy x -> string (withObject 4) x
   UserPwd x -> string (withObject 5) x

@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Curl.Internal.Types where
 
 import Control.Concurrent (MVar, newMVar, withMVar)
@@ -17,6 +19,7 @@ import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
 import Foreign.Ptr (Ptr)
 import GHC.Generics (Generic)
 import Network.HTTP.Types (Header)
+import qualified URI.ByteString
 
 -- | 'CurlResponse' is a record type encoding all the information
 -- embodied in a response to your Curl request. Currently only used
@@ -41,7 +44,15 @@ data CurlPrim
 
 type CurlHandle = Ptr CurlPrim
 
-type UrlString = String
+newtype Url = Url URI.ByteString.URI
+  deriving stock (Show, Generic)
+  deriving newtype (Eq, Ord)
+
+mkUrl :: MonadThrow m => ByteString -> m Url
+mkUrl =
+  fmap Url
+    . either (throwM . InvalidUrl . show) pure
+    . URI.ByteString.parseURI URI.ByteString.laxURIParserOptions
 
 type Port = Word32
 
@@ -55,6 +66,7 @@ data CurlOtherError
   | UnexpectedResponse InfoValue
   | CouldntOpenFile FilePath
   | FlushErrno Int
+  | InvalidUrl String
   deriving stock (Show, Generic)
 
 instance Exception CurlOtherError where
@@ -63,6 +75,7 @@ instance Exception CurlOtherError where
     UnexpectedResponse iv -> "Unexpected response value " <> show iv
     CouldntOpenFile fp -> "File couldn't be opened: " <> fp
     FlushErrno i -> "fflush failed with " <> show i
+    InvalidUrl e -> "Invalid URL: " <> e
 
 data CurlCode
   = CurlOK

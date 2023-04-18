@@ -11,6 +11,7 @@ import Data.Bits (Bits (complement, (.|.)))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.ByteString.Internal as ByteString.Internal
+import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.Functor (($>))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
@@ -19,7 +20,7 @@ import Foreign (Storable (pokeByteOff), mallocBytes, withForeignPtr)
 import Foreign.C (CChar, CInt (CInt), CString, withCString)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import GHC.Generics (Generic)
-import Network.HTTP.Types (ByteRange, renderByteRanges)
+import Network.HTTP.Types (ByteRange, Header, renderByteRanges)
 import qualified URI.ByteString
 
 -- | Represents C @FILE@ object for use with FFI
@@ -133,7 +134,7 @@ data CurlOption
   | -- | Set the Cookie: header to the given cookie (name=value pairs, semicolon-separated) string.
     Cookie String
   | -- | Embellish the outgoing request with the given list of (formatted) header values.
-    HttpHeaders [String]
+    HttpHeaders [Header]
   | -- | (Multipart) POST data.
     Multipart [HttpPost]
   | -- | file holding your private Ssl certificates (default format is PEM).
@@ -580,7 +581,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   LowSpeedTime x -> long (withLong 20) x
   ResumeFrom x -> long (withLong 21) x
   Cookie x -> string (withObject 22) x
-  HttpHeaders x -> strings (withObject 23) x
+  HttpHeaders x -> strings (withObject 23) $ renderHeaders <$> x
   Multipart x -> posts (withObject 24) x
   SslCert x -> string (withObject 25) x
   SslPassword x -> string (withObject 26) x
@@ -714,6 +715,13 @@ unmarshallOption um@Unmarshaller {..} = \case
   ProxyUser x -> string (withLong 175) x
   ProxyPassword x -> string (withLong 176) x
   where
+    -- TODO
+    -- Keep this as a bytestring
+    renderHeaders :: Header -> String
+    renderHeaders (name, v) =
+      ByteString.Char8.unpack $
+        CaseInsensitive.original name <> ": " <> v
+
     renderUserInfo :: URI.ByteString.UserInfo -> ByteString
     renderUserInfo =
       -- This drops the `@` added to the end by `uri-bytestring`

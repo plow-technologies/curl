@@ -13,7 +13,7 @@ import qualified Data.IntMap as IntMap
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
-import Foreign.C (CInt)
+import Foreign.C (CInt, CString)
 import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
 import Foreign.Ptr (Ptr)
@@ -271,3 +271,8 @@ cleanupOptionMap :: OptionMap -> IO ()
 cleanupOptionMap = sequence_ . IntMap.elems
 
 foreign import ccall "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()
+
+foreign import ccall "curl_slist_free_all" slistFree :: Ptr Slist -> IO ()
+
+foreign import ccall "curl_slist_append"
+  slistAppend :: Ptr Slist -> CString -> IO (Ptr Slist)

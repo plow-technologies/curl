@@ -42,11 +42,11 @@ head :: MonadIO m => Url -> [CurlOption] -> m CurlResponse
 head url = liftIO . runCurl . Internal.curlHead url
 
 -- | Run a @POST@ request, returning the 'CurlCode'
-post :: MonadIO m => Url -> [String] -> m CurlCode
+post :: MonadIO m => Url -> FormData -> m CurlCode
 post url = liftIO . runCurl . Internal.curlPost url
 
 -- | Run a @POST@ request, discarding the final 'CurlCode'
-post_ :: MonadIO m => Url -> [String] -> m ()
+post_ :: MonadIO m => Url -> FormData -> m ()
 post_ url = liftIO . void . runCurl . Internal.curlPost url
 
 -- | Run a multipart @POST@ request, returning the 'CurlCode'

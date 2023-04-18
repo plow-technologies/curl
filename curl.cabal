@@ -65,6 +65,7 @@ library
     , case-insensitive
     , containers
     , exceptions
+    , http-api-data
     , http-types
     , uri-bytestring
 

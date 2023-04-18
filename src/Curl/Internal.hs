@@ -93,7 +93,7 @@ curlHead url opts curl = do
 
 -- | 'curlPost' performs. a common POST operation, namely that
 -- of submitting a sequence of name=value pairs.
-curlPost :: Url -> [String] -> Curl -> IO CurlCode
+curlPost :: Url -> FormData -> Curl -> IO CurlCode
 curlPost s ps curl = do
   setopts curl [PostFields ps, CookieJar "cookies", UseUrl s]
   perform curl

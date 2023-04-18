@@ -5,6 +5,7 @@ import Curl.Internal.Opts as O
     DebugFunction (..),
     DebugInfo (..),
     File,
+    FormData (..),
     HttpAuth (..),
     HttpVersion (..),
     NetRcOption (..),
@@ -28,3 +29,4 @@ import Curl.Internal.Post as O
   )
 import Network.HTTP.Types as O (ByteRange (..))
 import URI.ByteString as O (UserInfo (..))
+import Web.FormUrlEncoded as O (Form (..))

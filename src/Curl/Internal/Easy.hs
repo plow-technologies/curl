@@ -52,7 +52,7 @@ setopt curl o = mask_ . void $ withCheckCurlCode doPrim
             let addOne :: Ptr Slist -> String -> IO (Ptr Slist)
                 addOne ip s = withCString s $ slistAppend ip
             ip <- foldM addOne nullPtr x
-            updateCleanup r i $ curlSlistFree ip
+            updateCleanup r i $ slistFree ip
             codeFromCInt <$> easySetoptString h i (castPtr ip),
           -- :: Int -> Ptr () -> IO a
           pointer = \i x -> codeFromCInt <$> easySetoptPtr h i x,
@@ -79,7 +79,7 @@ setopt curl o = mask_ . void $ withCheckCurlCode doPrim
           -- :: Int -> [HttpPost] -> IO a
           posts = \i x -> do
             p <- marshallPosts x
-            updateCleanup r i $ curlFormfree p
+            updateCleanup r i $ formFree p
             codeFromCInt <$> easySetoptPtr h i p,
           -- :: Int -> SSLCtxtFunction -> IO a
           sslctxt = \i x -> do

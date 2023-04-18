@@ -11,9 +11,9 @@ import Data.Bits (Bits (complement, (.|.)))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.ByteString.Internal as ByteString.Internal
+import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.Functor (($>))
-import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64, Word8)
 import Foreign (Storable (pokeByteOff), mallocBytes, withForeignPtr)
@@ -22,9 +22,15 @@ import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import GHC.Generics (Generic)
 import Network.HTTP.Types (ByteRange, Header, renderByteRanges)
 import qualified URI.ByteString
+import Web.FormUrlEncoded (Form, urlEncodeAsFormStable)
 
 -- | Represents C @FILE@ object for use with FFI
 data File
+
+data FormData
+  = FormData Form
+  | RawData ByteString
+  deriving stock (Show, Eq, Generic)
 
 -- | How to open a file, for C @fopen@
 data FileOpenMode
@@ -118,7 +124,7 @@ data CurlOption
   | -- | expected size of uploaded data.
     InFileSize Word32
   | -- | (Multipart) POST data.
-    PostFields [String]
+    PostFields FormData
   | -- | Set the Referer: header to the given string.
     Referer String
   | -- | The string to feed to the FTP PORT command.
@@ -135,7 +141,7 @@ data CurlOption
     Cookie String
   | -- | Embellish the outgoing request with the given list of (formatted) header values.
     HttpHeaders [Header]
-  | -- | (Multipart) POST data.
+  | -- | (Multipart) POST data. Corresponds to (deprecated) @CURLOPT_HTTPPOST@
     Multipart [HttpPost]
   | -- | file holding your private Ssl certificates (default format is PEM).
     SslCert FilePath
@@ -573,7 +579,9 @@ unmarshallOption um@Unmarshaller {..} = \case
   ReadFun x -> readFun (withFunc 12) x
   Timeout x -> long (withLong 13) x
   InFileSize x -> long (withLong 14) x
-  PostFields x -> string (withObject 15) $ intercalate "&" x
+  PostFields x -> bytestring (withObject 15) $ case x of
+    RawData bs -> bs
+    FormData form -> ByteString.Lazy.toStrict $ urlEncodeAsFormStable form
   Referer x -> string (withObject 16) x
   FtpPort x -> string (withObject 17) x
   UserAgent x -> string (withObject 18) x
@@ -582,6 +590,8 @@ unmarshallOption um@Unmarshaller {..} = \case
   ResumeFrom x -> long (withLong 21) x
   Cookie x -> string (withObject 22) x
   HttpHeaders x -> strings (withObject 23) $ renderHeaders <$> x
+  -- FIXME
+  -- This is deprecated. Should remove this and add `CURLOPT_MIMEPOST`
   Multipart x -> posts (withObject 24) x
   SslCert x -> string (withObject 25) x
   SslPassword x -> string (withObject 26) x

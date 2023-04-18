@@ -1,12 +1,15 @@
+-- FIXME
+-- This entire module needs to change
+-- Should be FFI bindings for `curl_mime`
 module Curl.Internal.Post where
 
 import Control.Monad (foldM, (<=<))
-import Curl.Internal.Types (Slist)
+import Curl.Internal.Types (slistAppend)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.Functor (($>), (<&>))
 import Data.Word (Word32)
-import Foreign.C.String (CString, newCString)
+import Foreign.C.String (newCString)
 import Foreign.C.Types (CChar)
 import Foreign.Marshal.Alloc (mallocBytes)
 import Foreign.Ptr (Ptr, nullPtr)
@@ -102,9 +105,4 @@ marshallPost HttpPost {..} = do
     ptrIndex :: Int -> Int
     ptrIndex n = n * sizeOf nullPtr
 
-foreign import ccall "curl_slist_append"
-  slistAppend :: Ptr Slist -> CString -> IO (Ptr Slist)
-
-foreign import ccall "curl_slist_free_all" curlSlistFree :: Ptr Slist -> IO ()
-
-foreign import ccall "curl_formfree" curlFormfree :: Ptr a -> IO ()
+foreign import ccall "curl_formfree" formFree :: Ptr a -> IO ()

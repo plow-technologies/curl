@@ -27,3 +27,4 @@ import Curl.Internal.Post as O
     multiformString,
   )
 import Network.HTTP.Types as O (ByteRange (..))
+import URI.ByteString as O (UserInfo (..))

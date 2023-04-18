@@ -95,13 +95,13 @@ curlHead url opts curl = do
 -- of submitting a sequence of name=value pairs.
 curlPost :: Url -> [String] -> Curl -> IO CurlCode
 curlPost s ps curl = do
-  setopts curl [Verbose True, PostFields ps, CookieJar "cookies", UseUrl s]
+  setopts curl [PostFields ps, CookieJar "cookies", UseUrl s]
   perform curl
 
 -- | 'curlMultiPost' perform a multi-part POST submission.
 curlMultipart :: Url -> [CurlOption] -> [HttpPost] -> Curl -> IO CurlCode
 curlMultipart s os ps curl = do
-  setopts curl [Verbose True, UseUrl s, Multipart ps]
+  setopts curl [UseUrl s, Multipart ps]
   setopts curl os
   perform curl
 

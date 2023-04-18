@@ -87,16 +87,16 @@ data CurlOption
     -- If you\'d like to use it as the last argument to a 'WriteFunction', use
     -- 'castPtr' to get the @Ptr ()@
     WriteData (Ptr File)
-  | -- | the URL to use for next request; can be the full URL or just the authority\/hostname.
+  | -- | the URL to use for next request
     UseUrl Url
   | -- | what port to use.
     Port Word32
   | -- | name of proxy
     Proxy String
   | -- | the "user:pass" string to use
-    UserPwd String
+    UserPwd URI.ByteString.UserInfo
   | -- | same thing, but for the proxy.
-    ProxyUserPwd String
+    ProxyUserPwd URI.ByteString.UserInfo
   | -- | byte range to fetch
     Range [ByteRange]
   | -- | external pointer to pass to as 'ReadFunction's last argument.
@@ -552,8 +552,8 @@ unmarshallOption um@Unmarshaller {..} = \case
       $ URI.ByteString.serializeURIRef' x
   Port x -> long (withLong 3) x
   Proxy x -> string (withObject 4) x
-  UserPwd x -> string (withObject 5) x
-  ProxyUserPwd x -> string (withObject 6) x
+  UserPwd x -> string (withObject 5) $ renderUserInfo x
+  ProxyUserPwd x -> string (withObject 6) $ renderUserInfo x
   Range x ->
     string (withObject 7)
       . ByteString.Char8.unpack
@@ -714,6 +714,13 @@ unmarshallOption um@Unmarshaller {..} = \case
   ProxyUser x -> string (withLong 175) x
   ProxyPassword x -> string (withLong 176) x
   where
+    renderUserInfo :: URI.ByteString.UserInfo -> String
+    renderUserInfo =
+      ByteString.Char8.unpack
+        -- This drops the `@` added to the end by `uri-bytestring`
+        . ByteString.Char8.dropEnd 1
+        . URI.ByteString.serializeUserInfo'
+
     withLong :: Int -> Int
     withLong = (baseLong +)
 

@@ -38,6 +38,10 @@ setopt curl o = mask_ . void $ withCheckCurlCode doPrim
           --  :: Int -> Word64    -> IO CurlCode
           llong = \i x -> codeFromCInt <$> easySetoptLLong h i x,
           -- :: Int -> String   -> IO CurlCode
+          bytestring = \i x -> do
+            cstr <- newCStringFromBytes x
+            updateCleanup r i $ free cstr
+            codeFromCInt <$> easySetoptString h i cstr,
           string = \i x -> do
             cstr <- newCString x
             updateCleanup r i $ free cstr

@@ -10,11 +10,14 @@ import Curl.Internal.Types hiding (CookieList, Filetime, Private)
 import Data.Bits (Bits (complement, (.|.)))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
+import qualified Data.ByteString.Internal as ByteString.Internal
+import Data.Functor (($>))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
-import Data.Word (Word32, Word64)
+import Data.Word (Word32, Word64, Word8)
+import Foreign (Storable (pokeByteOff), mallocBytes, withForeignPtr)
 import Foreign.C (CChar, CInt (CInt), CString, withCString)
-import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import GHC.Generics (Generic)
 import Network.HTTP.Types (ByteRange, renderByteRanges)
 import qualified URI.ByteString
@@ -89,7 +92,8 @@ data CurlOption
     WriteData (Ptr File)
   | -- | the URL to use for next request
     UseUrl Url
-  | -- | what port to use.
+  | -- | What port to use. Note that this will be set automatically for you when
+    -- using higher-level effects if the URL provideed to 'UseUrl' specifies a port
     Port Word32
   | -- | name of proxy
     Proxy String
@@ -546,17 +550,13 @@ baseOffT = 30000
 unmarshallOption :: Unmarshaller a -> CurlOption -> IO a
 unmarshallOption um@Unmarshaller {..} = \case
   WriteData x -> pointer (withObject 1) $ castPtr x
-  UseUrl (Url x) ->
-    string (withObject 2)
-      . ByteString.Char8.unpack
-      $ URI.ByteString.serializeURIRef' x
+  UseUrl (Url x) -> bytestring (withObject 2) $ URI.ByteString.serializeURIRef' x
   Port x -> long (withLong 3) x
   Proxy x -> string (withObject 4) x
-  UserPwd x -> string (withObject 5) $ renderUserInfo x
-  ProxyUserPwd x -> string (withObject 6) $ renderUserInfo x
+  UserPwd x -> bytestring (withObject 5) $ renderUserInfo x
+  ProxyUserPwd x -> bytestring (withObject 6) $ renderUserInfo x
   Range x ->
-    string (withObject 7)
-      . ByteString.Char8.unpack
+    bytestring (withObject 7)
       . fromMaybe byteRanges
       -- `renderByteRanges` will add the `bytes=` prefix, but this won't be
       -- accepted by libcurl. It's still nicer to use the `ByteRanges` type
@@ -714,12 +714,10 @@ unmarshallOption um@Unmarshaller {..} = \case
   ProxyUser x -> string (withLong 175) x
   ProxyPassword x -> string (withLong 176) x
   where
-    renderUserInfo :: URI.ByteString.UserInfo -> String
+    renderUserInfo :: URI.ByteString.UserInfo -> ByteString
     renderUserInfo =
-      ByteString.Char8.unpack
-        -- This drops the `@` added to the end by `uri-bytestring`
-        . ByteString.Char8.dropEnd 1
-        . URI.ByteString.serializeUserInfo'
+      -- This drops the `@` added to the end by `uri-bytestring`
+      ByteString.Char8.dropEnd 1 . URI.ByteString.serializeUserInfo'
 
     withLong :: Int -> Int
     withLong = (baseLong +)
@@ -737,6 +735,7 @@ data Unmarshaller a = Unmarshaller
   { long :: Int -> Word32 -> IO a,
     llong :: Int -> Word64 -> IO a,
     string :: Int -> String -> IO a,
+    bytestring :: Int -> ByteString -> IO a,
     strings :: Int -> [String] -> IO a,
     pointer :: Int -> Ptr () -> IO a,
     writeFun :: Int -> WriteFunction -> IO a,
@@ -763,6 +762,14 @@ unmarshalEnum Unmarshaller {long} x = long x . fromIntegral . fromEnum
 
 unmarshalCptr :: Unmarshaller a -> Int -> Ptr CChar -> IO a
 unmarshalCptr Unmarshaller {pointer} x = pointer x . castPtr
+
+-- | Allocate a new 'CString' directly from a 'ByteString'
+-- NOTE: The resulting 'CString' must be explicitly freed!
+newCStringFromBytes :: ByteString -> IO CString
+newCStringFromBytes (ByteString.Internal.PS fptr offset len) =
+  mallocBytes (len + 1) >>= \buf -> withForeignPtr fptr $ \ptr -> do
+    ByteString.Internal.memcpy buf (ptr `plusPtr` offset) len
+    pokeByteOff @Word8 buf len 0 $> castPtr buf
 
 foreign import ccall "fopen" fopen :: CString -> CString -> IO (Ptr File)
 

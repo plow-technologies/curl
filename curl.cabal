@@ -42,6 +42,7 @@ library
     DeriveGeneric
     DerivingStrategies
     DerivingVia
+    DuplicateRecordFields
     EmptyDataDecls
     ForeignFunctionInterface
     ForeignFunctionInterface

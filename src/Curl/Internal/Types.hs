@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Curl.Internal.Types where
@@ -51,6 +52,24 @@ type CurlHandle = Ptr CurlPrim
 newtype Url = Url URI.ByteString.URI
   deriving stock (Show, Generic)
   deriving newtype (Eq, Ord)
+
+-- | Convenience pattern for directly constructing a 'Url'
+pattern MkUrl :: ByteString -> ByteString -> ByteString -> Int -> Url
+pattern MkUrl {scheme, host, path, port} =
+  Url
+    ( URI.ByteString.URI
+        (URI.ByteString.Scheme scheme)
+        ( Just
+            ( URI.ByteString.Authority
+                Nothing
+                (URI.ByteString.Host host)
+                (Just (URI.ByteString.Port port))
+              )
+          )
+        path
+        (URI.ByteString.Query [])
+        Nothing
+      )
 
 mkUrl :: MonadThrow m => ByteString -> m Url
 mkUrl =

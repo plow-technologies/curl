@@ -25,6 +25,7 @@ library
     Curl.Internal
     Curl.Internal.Easy
     Curl.Internal.Info
+    Curl.Internal.Mime
     Curl.Internal.Opts
     Curl.Internal.Post
     Curl.Internal.Types

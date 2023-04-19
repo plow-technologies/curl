@@ -1,5 +1,10 @@
 module Curl.Opts (module O) where
 
+import Curl.Internal.Mime as O
+  ( MimeData (..),
+    MimeEncoder (..),
+    MimePart (..),
+  )
 import Curl.Internal.Opts as O
   ( CurlOption (..),
     DebugFunction (..),

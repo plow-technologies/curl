@@ -5,6 +5,7 @@ module Curl.Internal.Opts where
 import Control.Monad (unless)
 import Control.Monad.Catch (MonadThrow (throwM))
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Curl.Internal.Mime
 import Curl.Internal.Post (HttpPost)
 import Curl.Internal.Types hiding (CookieList, Filetime, Private)
 import Data.Bits (Bits (complement, (.|.)))
@@ -12,7 +13,6 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.ByteString.Internal as ByteString.Internal
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64, Word8)
@@ -87,6 +87,10 @@ pattern POST = [Post True, NoBody False]
 pattern HEAD :: [CurlOption]
 pattern HEAD = [Post False, NoBody True]
 
+-- | All of the options corresponding to @curl_easy_setopt@
+-- NOTE: This is a fork of a very old bindings library; there are several
+-- deprecated options still included here and several newer options that are
+-- missing
 data CurlOption
   = -- | External pointer to pass to as a 'WriteFunction'\'s last argument.
     -- If you don't pass a 'WriteFunction', libcurl will use the file pointer
@@ -391,6 +395,9 @@ data CurlOption
   | UserPassword String
   | ProxyUser String
   | ProxyPassword String
+  | -- | Posts data from a mime structure
+    -- NOTE: This should be used instead of 'Multipart'
+    MimePost [MimePart]
   deriving stock (Show)
 
 data HttpVersion
@@ -724,13 +731,12 @@ unmarshallOption um@Unmarshaller {..} = \case
   UserPassword x -> string (withLong 174) x
   ProxyUser x -> string (withLong 175) x
   ProxyPassword x -> string (withLong 176) x
+  MimePost ps -> mime (withObject 269) ps
   where
     -- TODO
     -- Keep this as a bytestring
     renderHeaders :: Header -> String
-    renderHeaders (name, v) =
-      ByteString.Char8.unpack $
-        CaseInsensitive.original name <> ": " <> v
+    renderHeaders = ByteString.Char8.unpack . renderHeader
 
     renderUserInfo :: URI.ByteString.UserInfo -> ByteString
     renderUserInfo =
@@ -761,6 +767,7 @@ data Unmarshaller a = Unmarshaller
     progressFun :: Int -> ProgressFunction -> IO a,
     debugFun :: Int -> DebugFunction -> IO a,
     posts :: Int -> [HttpPost] -> IO a,
+    mime :: Int -> [MimePart] -> IO a,
     sslctxt :: Int -> SslCtxtFunction -> IO a,
     ioctlFun :: Int -> Ptr () -> IO a,
     convFromNetwork :: Int -> Ptr () -> IO a,

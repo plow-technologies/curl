@@ -1,13 +1,9 @@
--- FIXME
--- This entire module needs to change
--- Should be FFI bindings for `curl_mime`
 module Curl.Internal.Post where
 
 import Control.Monad (foldM, (<=<))
-import Curl.Internal.Types (slistAppend)
+import Curl.Internal.Types (slistAppend, renderHeader)
 import qualified Data.ByteString.Char8 as ByteString.Char8
-import qualified Data.CaseInsensitive as CaseInsensitive
-import Data.Functor (($>), (<&>))
+import Data.Functor (($>))
 import Data.Word (Word32)
 import Foreign.C.String (newCString)
 import Foreign.C.Types (CChar)
@@ -97,10 +93,7 @@ marshallPost HttpPost {..} = do
   pure php
   where
     strHeaders :: [String]
-    strHeaders =
-      extraHeaders <&> \(k, v) ->
-        ByteString.Char8.unpack $
-          CaseInsensitive.original k <> ": " <> v
+    strHeaders = ByteString.Char8.unpack . renderHeader <$> extraHeaders
 
     ptrIndex :: Int -> Int
     ptrIndex n = n * sizeOf nullPtr

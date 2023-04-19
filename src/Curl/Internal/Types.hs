@@ -7,6 +7,7 @@ import Control.Exception (Exception (displayException))
 import Control.Monad.Catch (MonadThrow (throwM))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as Lazy.ByteString
+import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -33,6 +34,9 @@ data CurlResponse = CurlResponse
     info :: Map Info InfoValue
   }
   deriving stock (Show, Generic)
+
+renderHeader :: Header -> ByteString
+renderHeader (name, v) = CaseInsensitive.original name <> ": " <> v
 
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.

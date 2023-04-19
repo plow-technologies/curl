@@ -12,6 +12,7 @@ import Foreign.C.String (CString, newCString, peekCString, withCString)
 import Foreign.C.Types (CChar, CInt (CInt))
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, freeHaskellFunPtr, nullPtr)
+import Curl.Internal.Mime (newMime, mimeFree)
 
 runCurl :: (Curl -> IO a) -> IO a
 runCurl f = f =<< initialize
@@ -76,6 +77,10 @@ setopt curl o = mask_ . void $ withCheckCurlCode doPrim
             fp <- mkDebugFun $ debugToPrim dbgFun
             updateCleanup r i $ freeHaskellFunPtr fp
             codeFromCInt <$> easySetoptFptr h i fp,
+          mime = \i x -> do
+            mime <- newMime h x
+            updateCleanup r i $ mimeFree mime
+            codeFromCInt <$> easySetoptPtr h i mime,
           -- :: Int -> [HttpPost] -> IO a
           posts = \i x -> do
             p <- marshallPosts x

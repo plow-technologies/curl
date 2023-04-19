@@ -4,6 +4,7 @@
 module Curl.Internal.Types where
 
 import Control.Concurrent (MVar, newMVar, withMVar)
+import Control.DeepSeq (NFData)
 import Control.Exception (Exception (displayException))
 import Control.Monad.Catch (MonadThrow (throwM))
 import Data.ByteString (ByteString)
@@ -35,6 +36,7 @@ data CurlResponse = CurlResponse
     info :: Map Info InfoValue
   }
   deriving stock (Show, Generic)
+  deriving anyclass (NFData)
 
 renderHeader :: Header -> ByteString
 renderHeader (name, v) = CaseInsensitive.original name <> ": " <> v
@@ -185,8 +187,8 @@ data CurlCode
   | CurlAgain
   | CurlSslCRLBadFile
   | CurlSslIssuerError
-  deriving stock (Eq, Show, Enum)
-  deriving anyclass (Exception)
+  deriving stock (Show, Eq, Generic, Enum)
+  deriving anyclass (Exception, NFData)
 
 -- | Causes any non-'CurlOK' 'CurlCode' to be thrown as an exception
 withCheckCurlCode :: IO CurlCode -> IO CurlCode
@@ -230,6 +232,7 @@ data Info
   | LastSocket
   | FtpEntryPath
   deriving stock (Show, Eq, Generic, Ord, Enum, Bounded)
+  deriving anyclass (NFData)
 
 data InfoValue
   = String String
@@ -237,6 +240,7 @@ data InfoValue
   | Double Double
   | List [String]
   deriving stock (Show, Eq, Generic)
+  deriving anyclass (NFData)
 
 -- | Execute a "primitive" curl operation.
 -- NOTE: See warnings about the use of 'withForeignPtr'.

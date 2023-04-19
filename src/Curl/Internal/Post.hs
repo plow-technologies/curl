@@ -1,7 +1,7 @@
 module Curl.Internal.Post where
 
 import Control.Monad (foldM, (<=<))
-import Curl.Internal.Types (slistAppend, renderHeader)
+import Curl.Internal.Types (renderHeader, slistAppend)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import Data.Functor (($>))
 import Data.Word (Word32)

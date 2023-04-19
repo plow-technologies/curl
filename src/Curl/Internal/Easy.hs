@@ -2,6 +2,7 @@ module Curl.Internal.Easy where
 
 import Control.Monad (foldM, void)
 import Control.Monad.Catch (mask_)
+import Curl.Internal.Mime (mimeFree, newMime)
 import Curl.Internal.Opts
 import Curl.Internal.Post
 import Curl.Internal.Types
@@ -12,14 +13,12 @@ import Foreign.C.String (CString, newCString, peekCString, withCString)
 import Foreign.C.Types (CChar, CInt (CInt))
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, freeHaskellFunPtr, nullPtr)
-import Curl.Internal.Mime (newMime, mimeFree)
 
 runCurl :: (Curl -> IO a) -> IO a
 runCurl f = f =<< initialize
-
--- | Initialise a curl instance
-initialize :: IO Curl
-initialize = mask_ . mkCurl =<< easyInitialize
+  where
+    initialize :: IO Curl
+    initialize = mask_ . mkCurl =<< easyInitialize
 
 -- | Run a curl operation
 perform :: Curl -> IO CurlCode

@@ -66,9 +66,11 @@ library
     , bytestring        >=0.9
     , case-insensitive
     , containers
+    , deepseq
     , exceptions
     , http-api-data
     , http-types
+    , unliftio
     , uri-bytestring
 
 source-repository head

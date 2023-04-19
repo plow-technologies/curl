@@ -3,8 +3,10 @@
 
 module Curl.Internal where
 
-import Control.Monad (when, (>=>))
-import Control.Monad.Catch (MonadThrow (throwM))
+import Control.DeepSeq (NFData, force)
+import Control.Monad (void, when, (>=>))
+import Control.Monad.Catch (MonadMask, MonadThrow (throwM), finally)
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Curl.Internal.Easy
 import Curl.Internal.Info
 import Curl.Internal.Opts
@@ -24,6 +26,20 @@ import Data.Traversable (for)
 import Foreign.C (CInt, CStringLen)
 import Network.HTTP.Types (Header)
 import qualified URI.ByteString
+import UnliftIO.Exception (evaluate)
+
+-- | Run an 'IO' action, first initializing a global Curl instance and running
+-- cleanup afterwards (even in the case of exceptions). This is more efficient
+-- than running several smaller @curl_easy_*@ operations, each of which will
+-- implicitly initialize a global Curl
+--
+-- NOTE: The provided action must complete before the global cleanup is called!
+-- Make sure that the action does not fork; its return value will also be fully
+-- evaluated before completion
+withGlobalCurl :: (MonadIO m, MonadMask m, NFData a) => m a -> m a
+withGlobalCurl f = do
+  liftIO . void $ curlGlobalInit 3
+  finally (evaluate . force =<< f) $ liftIO curlGlobalCleanup
 
 runWithResponse :: Url -> [CurlOption] -> Curl -> IO CurlResponse
 runWithResponse url opts = runWithResponseInfo url opts mempty

@@ -17,7 +17,7 @@ where
 import Control.Monad (void)
 import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Curl.Internal as M (callbackWriter, ignoreOutput)
+import Curl.Internal as M (callbackWriter, ignoreOutput, withGlobalCurl)
 import qualified Curl.Internal as Internal
 import Curl.Internal.Easy
 import Curl.Internal.Opts

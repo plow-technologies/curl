@@ -1,4 +1,9 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
+
+#if __GLASGOW_HASKELL__ < 900
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+#endif
 
 module Curl.Internal.Opts where
 
@@ -13,6 +18,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.ByteString.Internal as ByteString.Internal
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import Data.Function ((&))
 import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32, Word64, Word8)
@@ -739,9 +745,12 @@ unmarshallOption um@Unmarshaller {..} = \case
     renderHeaders = ByteString.Char8.unpack . renderHeader
 
     renderUserInfo :: URI.ByteString.UserInfo -> ByteString
-    renderUserInfo =
+    renderUserInfo ui =
       -- This drops the `@` added to the end by `uri-bytestring`
-      ByteString.Char8.dropEnd 1 . URI.ByteString.serializeUserInfo'
+      -- NOTE: avoids using `dropEnd` to maintain compat with older
+      -- `bytestring` versions
+      URI.ByteString.serializeUserInfo' ui & \bs ->
+        ByteString.Char8.take (ByteString.Char8.length bs - 1) bs
 
     withLong :: Int -> Int
     withLong = (baseLong +)

@@ -19,23 +19,7 @@ license-file:       LICENSE
 author:             Sigbjorn Finne
 extra-source-files: CHANGELOG.md
 
-library
-  exposed-modules:
-    Curl
-    Curl.Internal
-    Curl.Internal.Easy
-    Curl.Internal.Info
-    Curl.Internal.Mime
-    Curl.Internal.Opts
-    Curl.Internal.Post
-    Curl.Internal.Types
-    Curl.Opts
-    Curl.Types
-
-  hs-source-dirs:     src
-  include-dirs:       cbits
-  c-sources:          cbits/curlc.c
-  extra-libraries:    curl
+common common
   default-extensions:
     CPP
     DeriveAnyClass
@@ -73,6 +57,35 @@ library
     , unliftio
     , uri-bytestring
 
+library
+  import:          common
+  exposed-modules:
+    Curl
+    Curl.Internal
+    Curl.Internal.Easy
+    Curl.Internal.Info
+    Curl.Internal.Mime
+    Curl.Internal.Opts
+    Curl.Internal.Post
+    Curl.Internal.Types
+    Curl.Opts
+    Curl.Types
+
+  hs-source-dirs:  src
+  include-dirs:    cbits
+  c-sources:       cbits/curlc.c
+  extra-libraries: curl
+
 source-repository head
   type:     git
   location: git://github.com/galoisinc/curl.git
+
+test-suite tests
+  import:         common
+  type:           exitcode-stdio-1.0
+  main-is:        Main.hs
+  hs-source-dirs: tests
+  build-depends:
+    , curl
+    , filepath
+    , hspec

@@ -74,7 +74,7 @@
             ];
           };
 
-          inherit (pkgs.curl-jr.flake { }) packages;
+          inherit (pkgs.curl-jr.flake { }) packages checks;
 
           devShells.default = (pkgs.curl-jr.flake { }).devShell;
 

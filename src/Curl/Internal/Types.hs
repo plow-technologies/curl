@@ -23,7 +23,7 @@ import Foreign.Concurrent (addForeignPtrFinalizer)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr_, withForeignPtr)
 import Foreign.Ptr (Ptr)
 import GHC.Generics (Generic)
-import Network.HTTP.Types (Header)
+import Network.HTTP.Types (Header, SimpleQueryItem)
 import qualified URI.ByteString
 
 -- | 'CurlResponse' is a record type encoding all the information
@@ -40,29 +40,41 @@ data CurlResponse = CurlResponse
   deriving stock (Show, Generic)
   deriving anyclass (NFData)
 
-renderHeader :: Header -> ByteString
-renderHeader (name, v) = CaseInsensitive.original name <> ": " <> v
-
 data Curl = Curl
   { handle :: MVar (ForeignPtr CurlPrim), -- libcurl is not thread-safe.
     cleanup :: IORef OptionMap -- deallocate Haskell curl data
   }
   deriving stock (Generic)
 
+-- | Opaque type for libcurl operations across the FFI
 data CurlPrim
 
+-- | Pointer to a Curl instance
 type CurlHandle = Ptr CurlPrim
 
+-- | A URL, which must be provided for all Curl operations. Will be used to set
+-- the @CURLOPT_URL@ option
 newtype Url = Url URI.ByteString.URI
   deriving stock (Show, Generic)
   deriving newtype (Eq, Ord)
 
+-- | Construct a 'Url' directly from a 'ByteString'. A @URIParseError@ will result
+-- if the URL string is malformed
+mkUrl :: MonadThrow m => ByteString -> m Url
+mkUrl =
+  fmap Url
+    . either (throwM . InvalidUrl . show) pure
+    . URI.ByteString.parseURI URI.ByteString.laxURIParserOptions
+
 -- | Convenience pattern for directly constructing a 'Url'
-pattern MkUrl :: ByteString -> ByteString -> [ByteString] -> Port -> Url
-pattern MkUrl {scheme, host, path, port} <-
+-- NOTE: Does not support fragments, and query items require parameters
+-- (to maintain straightforward compatibility with @uri-bytestring@)
+pattern MkUrl ::
+  Scheme -> ByteString -> [ByteString] -> Port -> [SimpleQueryItem] -> Url
+pattern MkUrl {scheme, host, path, port, query} <-
   Url
     ( URI.ByteString.URI
-        (URI.ByteString.Scheme scheme)
+        (URI.ByteString.Scheme (readScheme -> scheme))
         ( Just
             ( URI.ByteString.Authority
                 Nothing
@@ -71,17 +83,17 @@ pattern MkUrl {scheme, host, path, port} <-
               )
           )
         (splitPathSegments -> path)
-        (URI.ByteString.Query [])
+        (URI.ByteString.Query query)
         Nothing
       )
   where
-    MkUrl scheme host path port =
+    MkUrl scheme host path port query =
       Url $
         URI.ByteString.URI
-          (URI.ByteString.Scheme scheme)
+          (URI.ByteString.Scheme (renderScheme scheme))
           (Just authority)
           (renderPathSegments path)
-          (URI.ByteString.Query mempty)
+          (URI.ByteString.Query query)
           Nothing
       where
         authority :: URI.ByteString.Authority
@@ -91,11 +103,16 @@ pattern MkUrl {scheme, host, path, port} <-
             . URI.ByteString.Port
             $ fromIntegral port
 
-mkUrl :: MonadThrow m => ByteString -> m Url
-mkUrl =
-  fmap Url
-    . either (throwM . InvalidUrl . show) pure
-    . URI.ByteString.parseURI URI.ByteString.laxURIParserOptions
+-- | URL scheme. Only includes very common options; for other schemes, use the
+-- 'OtherScheme' constructor
+data Scheme
+  = Http
+  | Https
+  | File
+  | Ftp
+  | Ssh
+  | OtherScheme ByteString
+  deriving stock (Show, Eq, Generic)
 
 type Port = Word32
 
@@ -324,6 +341,27 @@ splitPathSegments =
 
 renderPathSegments :: [ByteString] -> ByteString
 renderPathSegments = ("/" <>) . ByteString.Char8.intercalate "/"
+
+readScheme :: ByteString -> Scheme
+readScheme = \case
+  "http" -> Http
+  "https" -> Https
+  "file" -> File
+  "ftp" -> Ftp
+  "ssh" -> Ssh
+  b -> OtherScheme b
+
+renderScheme :: Scheme -> ByteString
+renderScheme = \case
+  Http -> "http"
+  Https -> "https"
+  File -> "file"
+  Ftp -> "ftp"
+  Ssh -> "ssh"
+  OtherScheme b -> b
+
+renderHeader :: Header -> ByteString
+renderHeader (name, v) = CaseInsensitive.original name <> ": " <> v
 
 foreign import ccall "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()
 

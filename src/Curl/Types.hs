@@ -8,6 +8,7 @@ import Curl.Internal.Types as M
     Info (..),
     InfoValue (..),
     Port,
+    Scheme (..),
     Url (..),
     mkUrl,
     pattern MkUrl,

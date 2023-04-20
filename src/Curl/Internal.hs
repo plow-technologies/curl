@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternGuards #-}
 
@@ -27,6 +28,11 @@ import Foreign.C (CInt, CStringLen)
 import Network.HTTP.Types (Header)
 import qualified URI.ByteString
 import UnliftIO.Exception (evaluate)
+
+#if MIN_VERSION_bytestring(0,10,12)
+#else
+import Data.Char (isSpace)
+#endif
 
 -- | Run an 'IO' action, first initializing a global Curl instance and running
 -- cleanup afterwards (even in the case of exceptions). This is more efficient
@@ -204,7 +210,7 @@ parseStatusHeaders bs = case rlines bs of
     rlines ps
       | ByteString.Char8.null ps = mempty
       | otherwise =
-          ByteString.Char8.strip <$> case ByteString.Char8.elemIndex '\r' ps of
+          strip <$> case ByteString.Char8.elemIndex '\r' ps of
             Nothing -> [ps]
             Just n ->
               ByteString.Char8.take n ps
@@ -212,7 +218,7 @@ parseStatusHeaders bs = case rlines bs of
 
     parseHeader :: ByteString -> (ByteString, ByteString)
     parseHeader ps =
-      bimap ByteString.Char8.strip ByteString.Char8.strip $
+      bimap strip strip $
         case ByteString.Char8.break (':' ==) ps of
           (x, y)
             | Just (_, z) <- ByteString.Char8.uncons y -> (x, z)
@@ -239,3 +245,10 @@ getResponseCode c =
     Double d -> pure $ round d
     Long l -> pure $ fromIntegral l
     iv@(List _) -> throwM $ UnexpectedResponse iv
+
+strip :: ByteString -> ByteString
+#if MIN_VERSION_bytestring(0,10,12)
+strip = ByteString.Char8.strip
+#else
+strip = ByteString.Char8.dropWhile isSpace
+#endif

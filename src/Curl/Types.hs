@@ -10,4 +10,5 @@ import Curl.Internal.Types as M
     Port,
     Url (..),
     mkUrl,
+    pattern MkUrl,
   )

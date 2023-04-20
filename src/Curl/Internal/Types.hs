@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Curl.Internal.Types where
 
@@ -8,6 +9,7 @@ import Control.DeepSeq (NFData)
 import Control.Exception (Exception (displayException))
 import Control.Monad.Catch (MonadThrow (throwM))
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.ByteString.Lazy as Lazy.ByteString
 import qualified Data.CaseInsensitive as CaseInsensitive
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -56,8 +58,8 @@ newtype Url = Url URI.ByteString.URI
   deriving newtype (Eq, Ord)
 
 -- | Convenience pattern for directly constructing a 'Url'
-pattern MkUrl :: ByteString -> ByteString -> ByteString -> Int -> Url
-pattern MkUrl {scheme, host, path, port} =
+pattern MkUrl :: ByteString -> ByteString -> [ByteString] -> Port -> Url
+pattern MkUrl {scheme, host, path, port} <-
   Url
     ( URI.ByteString.URI
         (URI.ByteString.Scheme scheme)
@@ -65,13 +67,29 @@ pattern MkUrl {scheme, host, path, port} =
             ( URI.ByteString.Authority
                 Nothing
                 (URI.ByteString.Host host)
-                (Just (URI.ByteString.Port port))
+                (Just (URI.ByteString.Port (fromIntegral -> port)))
               )
           )
-        path
+        (splitPathSegments -> path)
         (URI.ByteString.Query [])
         Nothing
       )
+  where
+    MkUrl scheme host path port =
+      Url $
+        URI.ByteString.URI
+          (URI.ByteString.Scheme scheme)
+          (Just authority)
+          (renderPathSegments path)
+          (URI.ByteString.Query mempty)
+          Nothing
+      where
+        authority :: URI.ByteString.Authority
+        authority =
+          URI.ByteString.Authority Nothing (URI.ByteString.Host host)
+            . Just
+            . URI.ByteString.Port
+            $ fromIntegral port
 
 mkUrl :: MonadThrow m => ByteString -> m Url
 mkUrl =
@@ -296,6 +314,16 @@ setOptionMap opt new opts = do
 -- | Execute all IO actions in the map.
 cleanupOptionMap :: OptionMap -> IO ()
 cleanupOptionMap = sequence_ . IntMap.elems
+
+-- Other helpers
+
+splitPathSegments :: ByteString -> [ByteString]
+splitPathSegments =
+  filter (not . ByteString.Char8.null)
+    . ByteString.Char8.split '/'
+
+renderPathSegments :: [ByteString] -> ByteString
+renderPathSegments = ("/" <>) . ByteString.Char8.intercalate "/"
 
 foreign import ccall "curl/curl.h curl_easy_cleanup" easyCleanup :: CurlHandle -> IO ()
 

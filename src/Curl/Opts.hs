@@ -20,6 +20,7 @@ import Curl.Internal.Opts as O
     SshAuthType (..),
     SslCtxtFunction (..),
     TimeCond (..),
+    TranslationMode (..),
     WriteFunction (..),
     fclose,
     fflush,

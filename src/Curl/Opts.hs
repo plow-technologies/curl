@@ -10,6 +10,7 @@ import Curl.Internal.Opts as O
     DebugFunction (..),
     DebugInfo (..),
     File,
+    FileOpenMode (..),
     FormData (..),
     HttpAuth (..),
     HttpVersion (..),

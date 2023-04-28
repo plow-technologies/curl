@@ -314,7 +314,7 @@ data CurlOption
   | -- | max number of seconds to wait for remote server to ACK commands.
     FtpResponseTimeout Word32
   | -- | Whether to resolve wrt IPv4 or IPv6.
-    IPResolve Word32
+    IpResolve IpResolve
   | -- | Limit the number of bytes you're willing to download.
     MaxFileSize Word32
   | -- | Wider alternative of option giving upper bound of uploaded content (-1 => unknown.)
@@ -433,6 +433,14 @@ data HttpAuth
   | HttpAuthNTLM
   | HttpAuthAny
   | HttpAuthAnySafe
+  deriving stock (Show, Eq, Generic, Ord, Enum)
+
+-- | For use with 'IpResolve' option, to force Curl to use a specific protocal
+-- version
+data IpResolve
+  = IpResolveWhatever
+  | IpResolveV4
+  | IpResolveV6
   deriving stock (Show, Eq, Generic, Ord, Enum)
 
 toHttpAuthMask :: [HttpAuth] -> Word32
@@ -686,7 +694,7 @@ unmarshallOption um@Unmarshaller {..} = \case
   FtpCreateMissingDirs x -> unmarshalBool um (withLong 110) x
   ProxyAuth x -> long (withLong 111) (toHttpAuthMask x)
   FtpResponseTimeout x -> long (withLong 112) x
-  IPResolve x -> long (withLong 113) x
+  IpResolve x -> long (withLong 113) . fromIntegral $ fromEnum x
   MaxFileSize x -> long (withLong 114) x
   InFileSizeLarge x -> llong (withOffset 115) x
   ResumeFromLarge x -> llong (withOffset 116) x
